@@ -6,17 +6,18 @@ using System.Web.OData.Batch;
 using System.Web.OData.Routing;
 using System.Web.OData.Routing.Conventions;
 using Microsoft.OData.Edm;
+using OESoftware.Hosted.OData.Api.Interfaces;
 
 namespace OESoftware.Hosted.OData.Api.Routing
 {
     public static class Extensions
     {
-        public static void UseDynamicODataRoute(this HttpConfiguration config, string routeName, string routePrefix, string controllerName, Func<HttpRequestMessage, IEdmModel> modelProvider)
+        public static void UseDynamicODataRoute(this HttpConfiguration config, string routeName, string routePrefix, string controllerName, IModelProvider modelProvider)
         {
             UseDynamicODataRoute(config, routeName, routePrefix, controllerName, modelProvider, null);
         }
 
-        public static void UseDynamicODataRoute(this HttpConfiguration config, string routeName, string routePrefix, string controllerName, Func<HttpRequestMessage, IEdmModel> modelProvider,
+        public static void UseDynamicODataRoute(this HttpConfiguration config, string routeName, string routePrefix, string controllerName, IModelProvider modelProvider,
             ODataBatchHandler batchHandler)
         {
             if (!string.IsNullOrEmpty(routePrefix))

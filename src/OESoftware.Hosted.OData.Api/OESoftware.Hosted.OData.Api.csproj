@@ -99,6 +99,7 @@
     <Reference Include="System.EnterpriseServices" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Interfaces\IModelProvider.cs" />
     <Compile Include="Routing\Extensions.cs" />
     <Compile Include="Routing\DynamicODataPathRouteConstraint.cs" />
     <Compile Include="Routing\DynamicODataRoute.cs" />

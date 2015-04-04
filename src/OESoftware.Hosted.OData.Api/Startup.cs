@@ -15,9 +15,6 @@ namespace OESoftware.Hosted.OData.Api
 {
     public class Startup
     {
-        public const string DynamicODataPath = "DynamicODataPath";
-        private const string ODataDataSource = "ODataDataSource";
-
         public void Configuration(IAppBuilder app)
         {
             var webApiConfiguration = ConfigureWebApi();
@@ -29,23 +26,9 @@ namespace OESoftware.Hosted.OData.Api
         private HttpConfiguration ConfigureWebApi()
         {
             var config = new HttpConfiguration();
-            config.UseDynamicODataRoute("odata", string.Empty, "", GetModelFuncFromRequest());
+            config.UseDynamicODataRoute("odata", string.Empty, "", null);
             config.AddODataQueryFilter();
             return config;
-        }
-
-        private static Func<HttpRequestMessage, IEdmModel> GetModelFuncFromRequest()
-        {
-            return request =>
-            {
-                string odataPath = request.Properties[DynamicODataPath] as string ?? string.Empty;
-                string[] segments = odataPath.Split('/');
-                string dataSource = segments[0];
-                request.Properties[ODataDataSource] = dataSource;
-                IEdmModel model = new EdmModel();//TODO: DataSourceProvider.GetEdmModel(dataSource);
-                request.Properties[DynamicODataPath] = string.Join("/", segments, 1, segments.Length - 1);
-                return model;
-            };
         }
     }
 }

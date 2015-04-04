@@ -10,6 +10,7 @@ using System.Web.OData.Routing.Conventions;
 using Microsoft.OData.Core;
 using Microsoft.OData.Edm;
 using Microsoft.OData.Edm.Library;
+using OESoftware.Hosted.OData.Api.Interfaces;
 
 namespace OESoftware.Hosted.OData.Api.Routing
 {
@@ -20,10 +21,10 @@ namespace OESoftware.Hosted.OData.Api.Routing
         // "%2F"
         private static readonly string EscapedSlash = Uri.HexEscape('/');
 
-        public Func<HttpRequestMessage, IEdmModel> EdmModelProvider { get; set; }
+        public IModelProvider EdmModelProvider { get; set; }
 
         public DynamicODataPathRouteConstraint(
-            Func<HttpRequestMessage, IEdmModel> modelProvider,
+            IModelProvider modelProvider,
             string routeName,
             IEnumerable<IODataRoutingConvention> routingConventions)
             : base(new DefaultODataPathHandler(), new EdmModel(), routeName, routingConventions)
@@ -67,7 +68,7 @@ namespace OESoftware.Hosted.OData.Api.Routing
             {
                 request.Properties[DynamicODataPath] = oDataPathString;
 
-                model = EdmModelProvider(request);
+                model = EdmModelProvider.GetModel(request);
                 oDataPathString = (string)request.Properties[DynamicODataPath];
 
                 var requestLeftPart = request.RequestUri.GetLeftPart(UriPartial.Path);
