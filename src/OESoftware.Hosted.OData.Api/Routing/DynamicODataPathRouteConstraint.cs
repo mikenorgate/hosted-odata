@@ -68,7 +68,7 @@ namespace OESoftware.Hosted.OData.Api.Routing
             {
                 request.Properties[DynamicODataPath] = oDataPathString;
 
-                model = EdmModelProvider.GetModel(request);
+                model = EdmModelProvider.FromRequest(request).Result;
                 oDataPathString = (string)request.Properties[DynamicODataPath];
 
                 var requestLeftPart = request.RequestUri.GetLeftPart(UriPartial.Path);

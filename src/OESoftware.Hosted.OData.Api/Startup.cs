@@ -6,6 +6,7 @@ using Microsoft.OData.Edm;
 using Microsoft.OData.Edm.Library;
 using Microsoft.Owin;
 using OESoftware.Hosted.OData.Api;
+using OESoftware.Hosted.OData.Api.Models;
 using OESoftware.Hosted.OData.Api.Routing;
 using Owin;
 
@@ -26,8 +27,11 @@ namespace OESoftware.Hosted.OData.Api
         private HttpConfiguration ConfigureWebApi()
         {
             var config = new HttpConfiguration();
-            config.UseDynamicODataRoute("odata", string.Empty, "", null);
+            config.MapHttpAttributeRoutes();
+            config.UseDynamicODataRoute("odata", string.Empty, "", new ModelProvider());
             config.AddODataQueryFilter();
+
+            config.EnsureInitialized();
             return config;
         }
     }

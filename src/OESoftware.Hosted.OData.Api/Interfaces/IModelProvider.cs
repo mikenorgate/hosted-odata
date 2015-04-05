@@ -10,6 +10,6 @@ namespace OESoftware.Hosted.OData.Api.Interfaces
 {
     public interface IModelProvider
     {
-        IEdmModel GetModel(HttpRequestMessage request);
+        Task<IEdmModel> FromRequest(HttpRequestMessage request);
     }
 }

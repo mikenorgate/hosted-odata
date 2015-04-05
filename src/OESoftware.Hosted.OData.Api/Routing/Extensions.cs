@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Web.Http;
 using System.Web.OData.Batch;
@@ -39,7 +40,9 @@ namespace OESoftware.Hosted.OData.Api.Routing
             }
 
             IList<IODataRoutingConvention> routingConventions = ODataRoutingConventions.CreateDefault();
+            routingConventions = routingConventions.Except(routingConventions.OfType<MetadataRoutingConvention>()).ToList();
             routingConventions.Insert(0, new DynamicODataRoutingConvention(controllerName));
+            routingConventions.Insert(1, new ODataMetadataRoutingConvention("MetadataModify"));
             DynamicODataPathRouteConstraint routeConstraint = new DynamicODataPathRouteConstraint(
                 modelProvider,
                 routeName,
