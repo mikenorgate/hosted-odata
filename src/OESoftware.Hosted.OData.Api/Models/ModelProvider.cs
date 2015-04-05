@@ -22,8 +22,8 @@ namespace OESoftware.Hosted.OData.Api.Models
 {
     public class ModelProvider : IModelProvider
     {
-        public const string DynamicODataPath = "DynamicODataPath";
-        public const string ODataDataSource = "ODataDataSource";
+        private const string DynamicODataPath = "DynamicODataPath";
+        private const string ODataDataSource = "ODataDataSource";
         private static readonly MemoryCache ModelCache = new MemoryCache("ModelCache");
 
         public async Task<IEdmModel> FromRequest(HttpRequestMessage request)
@@ -34,7 +34,11 @@ namespace OESoftware.Hosted.OData.Api.Models
             request.Properties[ODataDataSource] = dataSource;
             request.Properties[DynamicODataPath] = string.Join("/", segments, 1, segments.Length - 1);
 
-            var dbIdentifier = "test";
+            var dbIdentifier = request.GetOwinEnvironment()["DbId"] as string;
+            if (dbIdentifier == null)
+            {
+                throw new ApplicationException("Invalid DB identifier");
+            }
 
             var cached = ModelCache.Get(dbIdentifier) as IEdmModel;
             if (cached != null)
@@ -62,7 +66,10 @@ namespace OESoftware.Hosted.OData.Api.Models
                         disposables.Add(stringReader);
                     });
                 CsdlReader.TryParse(readers, out model, out errors);
-                ModelCache.Add(dbIdentifier, model, new CacheItemPolicy());
+                if (model != null)
+                {
+                    ModelCache.Add(dbIdentifier, model, new CacheItemPolicy());
+                }
                 return model ?? new EdmModel();
             }
             finally
@@ -76,7 +83,11 @@ namespace OESoftware.Hosted.OData.Api.Models
             var updates = model.ToDbUpdates();
             if (updates.ModelErrors.Any()) return false;
 
-            var dbIdentifier = "test";
+            var dbIdentifier = request.GetOwinEnvironment()["DbId"] as string;
+            if (dbIdentifier == null)
+            {
+                throw new ApplicationException("Invalid DB identifier");
+            }
 
             var dbConnection = DBConnectionFactory.Open(dbIdentifier); //TODO: Get db name;
             var collection = dbConnection.GetCollection<SchemaElement>("_schema");
@@ -100,7 +111,11 @@ namespace OESoftware.Hosted.OData.Api.Models
             var updates = model.ToDbUpdates();
             if (updates.ModelErrors.Any()) return false;
 
-            var dbIdentifier = "test";
+            var dbIdentifier = request.GetOwinEnvironment()["DbId"] as string;
+            if (dbIdentifier == null)
+            {
+                throw new ApplicationException("Invalid DB identifier");
+            }
 
             var dbConnection = DBConnectionFactory.Open(dbIdentifier); //TODO: Get db name;
             var collection = dbConnection.GetCollection<SchemaElement>("_schema");

@@ -6,6 +6,7 @@ using Microsoft.OData.Edm;
 using Microsoft.OData.Edm.Library;
 using Microsoft.Owin;
 using OESoftware.Hosted.OData.Api;
+using OESoftware.Hosted.OData.Api.Middleware;
 using OESoftware.Hosted.OData.Api.Models;
 using OESoftware.Hosted.OData.Api.Routing;
 using Owin;
@@ -18,8 +19,9 @@ namespace OESoftware.Hosted.OData.Api
     {
         public void Configuration(IAppBuilder app)
         {
-            var webApiConfiguration = ConfigureWebApi();
+            app.Use(typeof(ApiKeyValidation));
 
+            var webApiConfiguration = ConfigureWebApi();
             // Use the extension method provided by the WebApi.Owin library:
             app.UseWebApi(webApiConfiguration);
         }

@@ -85,6 +85,7 @@
       <HintPath>..\..\packages\Microsoft.AspNet.WebApi.Client.5.2.2\lib\net45\System.Net.Http.Formatting.dll</HintPath>
     </Reference>
     <Reference Include="System.Runtime.Caching" />
+    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Web.DynamicData" />
     <Reference Include="System.Web.Entity" />
     <Reference Include="System.Web.ApplicationServices" />
@@ -115,11 +116,15 @@
     <Reference Include="System.EnterpriseServices" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Attributes\AnyKeyAuthorizeAttribute.cs" />
+    <Compile Include="Attributes\PrivateKeyAuthorizeAttribute.cs" />
+    <Compile Include="Attributes\PublicKeyAuthorizeAttribute.cs" />
     <Compile Include="Controllers\AdminController.cs" />
     <Compile Include="Controllers\MetadataModifyController.cs" />
     <Compile Include="DBHelpers\DBConnectionFactory.cs" />
     <Compile Include="DBHelpers\EdmModelDBUpdates.cs" />
     <Compile Include="Interfaces\IModelProvider.cs" />
+    <Compile Include="Middleware\ApiKeyValidation.cs" />
     <Compile Include="Models\Admin\Application.cs" />
     <Compile Include="Models\Admin\ApplicationRegistrationModel.cs" />
     <Compile Include="Models\ModelProvider.cs" />

@@ -39,7 +39,8 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 AdminEmailAddress = model.AdminEmailAddress,
                 ApplicationName = model.ApplicationName,
                 PrivateApiKey = ObjectId.GenerateNewId(),
-                PublicApiKey = ObjectId.GenerateNewId()
+                PublicApiKey = ObjectId.GenerateNewId(),
+                DbIdentifier = ObjectId.GenerateNewId()
             };
 
             await collection.InsertOneAsync(app);

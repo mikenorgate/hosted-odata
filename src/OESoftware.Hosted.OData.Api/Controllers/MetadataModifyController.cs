@@ -7,23 +7,28 @@ using System.Web.OData.Extensions;
 using System.Xml;
 using Microsoft.OData.Edm.Validation;
 using MongoDB.Driver;
+using OESoftware.Hosted.OData.Api.Attributes;
 using OESoftware.Hosted.OData.Api.DBHelpers;
 using OESoftware.Hosted.OData.Api.Models;
 
 namespace OESoftware.Hosted.OData.Api.Controllers
 {
+    [AnyKeyAuthorizeAttribute]
     public class MetadataModifyController : MetadataController
     {
+        [PrivateKeyAuthorize]
         public async Task<IHttpActionResult> Post()
         {
             return await UpdateSchema(true);
         }
 
+        [PrivateKeyAuthorize]
         public async Task<IHttpActionResult> Put()
         {
             return await UpdateSchema(false);
         }
 
+        [PrivateKeyAuthorize]
         public async Task<IHttpActionResult> Delete()
         {
             var modelProvider = new ModelProvider();
