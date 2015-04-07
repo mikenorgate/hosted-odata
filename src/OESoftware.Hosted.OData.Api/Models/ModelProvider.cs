@@ -52,6 +52,7 @@ namespace OESoftware.Hosted.OData.Api.Models
             var allSchemaElements = await collection.FindAsync(new BsonDocument());
             var readers = new List<XmlReader>();
             var disposables = new List<IDisposable>();
+            EdmEntityContainer entityContainer = null;
             try
             {
                 IEdmModel model;
@@ -64,13 +65,25 @@ namespace OESoftware.Hosted.OData.Api.Models
                         readers.Add(xmlReader);
                         disposables.Add(xmlReader);
                         disposables.Add(stringReader);
+                        if (entityContainer == null)
+                        {
+                            entityContainer = new EdmEntityContainer(f.ContainerNamespace, f.ContainerName);
+                        }
                     });
                 CsdlReader.TryParse(readers, out model, out errors);
-                if (model != null)
+                var edmModel = model as EdmModel;
+                if (edmModel != null)
                 {
+                    edmModel.AddElement(entityContainer);
+
                     ModelCache.Add(dbIdentifier, model, new CacheItemPolicy());
                 }
+
                 return model ?? new EdmModel();
+            }
+            catch
+            {
+                return new EdmModel();
             }
             finally
             {

@@ -20,5 +20,8 @@ namespace OESoftware.Hosted.OData.Api.Models
 
         [BsonRequired]
         public string Csdl { get; set; }
+
+        public string ContainerName { get; set; }
+        public string ContainerNamespace { get; set; }
     }
 }

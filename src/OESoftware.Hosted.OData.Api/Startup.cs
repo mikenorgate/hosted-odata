@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net.Http;
 using System.Web.Http;
+using System.Web.Http.Validation;
 using System.Web.OData.Extensions;
 using Microsoft.OData.Edm;
 using Microsoft.OData.Edm.Library;
@@ -30,8 +31,9 @@ namespace OESoftware.Hosted.OData.Api
         {
             var config = new HttpConfiguration();
             config.MapHttpAttributeRoutes();
-            config.UseDynamicODataRoute("odata", string.Empty, "", new ModelProvider());
+            config.UseDynamicODataRoute("odata", string.Empty, "HandleAllOData", new ModelProvider());
             config.AddODataQueryFilter();
+            config.Services.Replace(typeof(IBodyModelValidator), new ODataBodyModelValidator());
 
             config.EnsureInitialized();
             return config;

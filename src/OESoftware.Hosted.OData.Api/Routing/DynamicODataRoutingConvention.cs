@@ -20,7 +20,8 @@ namespace OESoftware.Hosted.OData.Api.Routing
             HttpControllerContext controllerContext,
             ILookup<string, HttpActionDescriptor> actionMap)
         {
-            return null;
+            if (odataPath.EdmType == null) return null;
+            return controllerContext.Request.Method.ToString();
         }
 
         public string SelectController(ODataPath odataPath, HttpRequestMessage request)

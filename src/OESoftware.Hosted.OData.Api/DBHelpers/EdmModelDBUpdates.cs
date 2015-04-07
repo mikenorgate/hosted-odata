@@ -45,7 +45,9 @@ namespace OESoftware.Hosted.OData.Api.DBHelpers
                 }
                 var filter = new ExpressionFilterDefinition<SchemaElement>(f => f.Name == schema.Name && f.Namespace == schema.Namespace);
                 var update = Builders<SchemaElement>.Update
-                    .Set(schemaElement => schemaElement.Csdl, xmlBuilder.ToString());
+                    .Set(schemaElement => schemaElement.Csdl, xmlBuilder.ToString())
+                    .Set(schemaElement => schemaElement.ContainerName, model.EntityContainer.Name)
+                    .Set(schemaElement => schemaElement.ContainerNamespace, model.EntityContainer.Namespace);
                 updates.Add(new EdmModelDbUpdates.DbUpdate { FilterDefinition = filter, UpdateDefinition = update });
             }
 

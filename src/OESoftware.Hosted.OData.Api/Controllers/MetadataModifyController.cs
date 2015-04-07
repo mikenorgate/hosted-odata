@@ -13,7 +13,7 @@ using OESoftware.Hosted.OData.Api.Models;
 
 namespace OESoftware.Hosted.OData.Api.Controllers
 {
-    [AnyKeyAuthorizeAttribute]
+    [AnyKeyAuthorize]
     public class MetadataModifyController : MetadataController
     {
         [PrivateKeyAuthorize]
