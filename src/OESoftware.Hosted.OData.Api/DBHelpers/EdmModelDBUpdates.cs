@@ -41,7 +41,7 @@ namespace OESoftware.Hosted.OData.Api.DBHelpers
                 tempModel.AddElement(schema);
                 using (var xmlWriter = XmlWriter.Create(xmlBuilder, new XmlWriterSettings() { Encoding = Encoding.UTF32 }))
                 {
-                    tempModel.TryWriteCsdl(xmlWriter, out errors);
+                    model.TryWriteCsdl(xmlWriter, out errors);
                 }
                 var filter = new ExpressionFilterDefinition<SchemaElement>(f => f.Name == schema.Name && f.Namespace == schema.Namespace);
                 var update = Builders<SchemaElement>.Update

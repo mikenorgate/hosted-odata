@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.Caching;
+using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 using System.Xml;
@@ -47,95 +48,49 @@ namespace OESoftware.Hosted.OData.Api.Models
             }
 
             var dbConnection = DBConnectionFactory.Open(dbIdentifier); //TODO: Get db name;
-            var collection = dbConnection.GetCollection<SchemaElement>("_schema");
+            var collection = dbConnection.GetCollection<BsonDocument>("_schema");
 
-            var allSchemaElements = await collection.FindAsync(new BsonDocument());
-            var readers = new List<XmlReader>();
-            var disposables = new List<IDisposable>();
-            EdmEntityContainer entityContainer = null;
-            try
+            var schema = (await (await collection.FindAsync(new BsonDocument())).ToListAsync()).FirstOrDefault();
+            if (schema == null) return new EdmModel();
+
+            using (var stringReader = new StringReader(schema.GetElement("value").Value.AsString))
             {
-                IEdmModel model;
-                IEnumerable<EdmError> errors;
-                await
-                    allSchemaElements.ForEachAsync(f =>
-                    {
-                        var stringReader = new StringReader(f.Csdl);
-                        var xmlReader = XmlReader.Create(stringReader);
-                        readers.Add(xmlReader);
-                        disposables.Add(xmlReader);
-                        disposables.Add(stringReader);
-                        if (entityContainer == null)
-                        {
-                            entityContainer = new EdmEntityContainer(f.ContainerNamespace, f.ContainerName);
-                        }
-                    });
-                CsdlReader.TryParse(readers, out model, out errors);
-                var edmModel = model as EdmModel;
-                if (edmModel != null)
+                using (var xmlReader = XmlReader.Create(stringReader))
                 {
-                    edmModel.AddElement(entityContainer);
-
-                    ModelCache.Add(dbIdentifier, model, new CacheItemPolicy());
+                    return EdmxReader.Parse(xmlReader);
                 }
-
-                return model ?? new EdmModel();
-            }
-            catch
-            {
-                return new EdmModel();
-            }
-            finally
-            {
-                disposables.ForEach(r => r.Dispose());
             }
         }
 
-        public async Task<bool> SaveModel(IEdmModel model, HttpRequestMessage request, bool replace)
+        public async Task<bool> SaveModel(IEdmModel model, HttpRequestMessage request)
         {
-            var updates = model.ToDbUpdates();
-            if (updates.ModelErrors.Any()) return false;
-
             var dbIdentifier = request.GetOwinEnvironment()["DbId"] as string;
             if (dbIdentifier == null)
             {
                 throw new ApplicationException("Invalid DB identifier");
             }
 
-            var dbConnection = DBConnectionFactory.Open(dbIdentifier); //TODO: Get db name;
-            var collection = dbConnection.GetCollection<SchemaElement>("_schema");
-
-            if (replace)
+            var xmlBuilder = new StringBuilder();
+            IEnumerable<EdmError> errors;
+            using (var xmlWriter = XmlWriter.Create(xmlBuilder, new XmlWriterSettings() { Encoding = Encoding.UTF32 }))
             {
-                await collection.DeleteManyAsync(Builders<SchemaElement>.Filter.In(f => f.Namespace, model.DeclaredNamespaces));
+                EdmxWriter.TryWriteEdmx(model, xmlWriter, EdmxTarget.OData, out errors);
             }
 
-            var updateOperations = updates.Updates.Select(update => new UpdateOneModel<SchemaElement>(update.FilterDefinition, update.UpdateDefinition) {IsUpsert = true}).ToList();
-
-            await collection.BulkWriteAsync(updateOperations);
-
-            ModelCache.Remove(dbIdentifier);
-
-            return true;
-        }
-
-        public async Task<bool> DeleteModel(IEdmModel model, HttpRequestMessage request)
-        {
-            var updates = model.ToDbUpdates();
-            if (updates.ModelErrors.Any()) return false;
-
-            var dbIdentifier = request.GetOwinEnvironment()["DbId"] as string;
-            if (dbIdentifier == null)
+            if (errors.Any())
             {
-                throw new ApplicationException("Invalid DB identifier");
+                return false;
             }
 
-            var dbConnection = DBConnectionFactory.Open(dbIdentifier); //TODO: Get db name;
-            var collection = dbConnection.GetCollection<SchemaElement>("_schema");
+            var dbConnection = DBConnectionFactory.Open(dbIdentifier);
+            var collection = dbConnection.GetCollection<BsonDocument>("_schema");
 
-            var deleteOperations = model.SchemaElements.Select(schema => new DeleteOneModel<SchemaElement>(new ExpressionFilterDefinition<SchemaElement>(s => s.Name == schema.Name && s.Namespace == schema.Namespace))).ToList();
+            await collection.DeleteOneAsync(new BsonDocumentFilterDefinition<BsonDocument>(new BsonDocument()));
 
-            await collection.BulkWriteAsync(deleteOperations);
+            var doc = new BsonDocument();
+            doc.Add(new BsonElement("_id", new BsonInt32(1)));
+            doc.Add(new BsonElement("value", new BsonString(xmlBuilder.ToString())));
+            await collection.InsertOneAsync(doc);
 
             ModelCache.Remove(dbIdentifier);
 
@@ -144,29 +99,13 @@ namespace OESoftware.Hosted.OData.Api.Models
 
         public IEdmModel FromXml(string xml, out IEnumerable<EdmError> errors)
         {
-            var readers = new List<XmlReader>();
-            var disposables = new List<IDisposable>();
-            try
+            using (var stringReader = new StringReader(xml))
             {
-                XmlDocument doc = new XmlDocument();
-                doc.LoadXml(xml);
-                doc.GetElementsByTagName("Schema").Cast<XmlNode>().ToList().ForEach(node =>
+                using (var xmlReader = XmlReader.Create(stringReader))
                 {
-                    var stringReader = new StringReader(node.OuterXml);
-                    var xmlReader = XmlReader.Create(stringReader);
-                    readers.Add(xmlReader);
-                    disposables.Add(xmlReader);
-                    disposables.Add(stringReader);
-                });
-
-                IEdmModel model;
-                CsdlReader.TryParse(readers.AsEnumerable(), out model, out errors);
-
-                return model;
-            }
-            finally
-            {
-                disposables.ForEach(r => r.Dispose());
+                    IEdmModel model;
+                    return EdmxReader.TryParse(xmlReader, out model, out errors) ? model : null;
+                }
             }
         }
     }

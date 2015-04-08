@@ -125,10 +125,14 @@
     <Compile Include="Controllers\HandleAllODataController.cs" />
     <Compile Include="DBHelpers\DBConnectionFactory.cs" />
     <Compile Include="DBHelpers\EdmModelDBUpdates.cs" />
+    <Compile Include="DBHelpers\KeyGenerator.cs" />
+    <Compile Include="EdmConstants.cs" />
+    <Compile Include="Extensions\EdmEntityObjectExtensions.cs" />
     <Compile Include="Interfaces\IModelProvider.cs" />
     <Compile Include="Middleware\ApiKeyValidation.cs" />
     <Compile Include="Models\Admin\Application.cs" />
     <Compile Include="Models\Admin\ApplicationRegistrationModel.cs" />
+    <Compile Include="Models\IdCounter.cs" />
     <Compile Include="Models\ModelProvider.cs" />
     <Compile Include="Models\SchemaElement.cs" />
     <Compile Include="Routing\ODataBodyModelValidator.cs" />

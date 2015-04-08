@@ -18,6 +18,7 @@ using Microsoft.OData.Edm.Library;
 using Microsoft.OData.Edm.Validation;
 using MongoDB.Bson;
 using OESoftware.Hosted.OData.Api.DBHelpers;
+using OESoftware.Hosted.OData.Api.Extensions;
 using OESoftware.Hosted.OData.Api.Models;
 
 namespace OESoftware.Hosted.OData.Api.Controllers
@@ -69,6 +70,10 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 return BadRequest(ModelState);
             }
 
+            await entity.SetComputedKeys(model, Request);
+
+            
+
             //_db.Products.Add(product);
             //await _db.SaveChangesAsync();
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
@@ -99,7 +104,6 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 var name = property.Name;
                 //If this is the key move it to _id 
                 //TODO: Support of multiple keys
-                //TODO: Autogeneration of ids
                 if (name.Equals(keyName, StringComparison.InvariantCultureIgnoreCase))
                 {
                     name = "_id";
@@ -114,6 +118,14 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 if (property.ReferentialConstraint == null)
                 {
                     doc.Add(new BsonElement(property.Name, new BsonArray()));
+                }
+            }
+
+            if (entityType.IsOpen())
+            {
+                foreach (var property in entity.TryGetDynamicProperties())
+                {
+                    doc.Add(new BsonElement(property.Key, BsonValue.Create(property.Value)));
                 }
             }
 

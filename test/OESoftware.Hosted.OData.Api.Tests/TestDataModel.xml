@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:Reference Uri="http://docs.oasis-open.org/odata/odata/v4.0/os/vocabularies/Org.OData.Core.V1.xml">
+    <edmx:Include Alias="Core" Namespace="Org.OData.Core.V1"/>
+  </edmx:Reference>
+  <edmx:DataServices>
+    <Schema Namespace="NorthwindModel" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="Item">
+        <Key>
+          <PropertyRef Name="ItemID"/>
+        </Key>
+        <Property Name="ItemID" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="ItemName" Type="Edm.String"/>
+      </EntityType>
+    <EntityType Name="OpenItem" OpenType="true">
+        <Key>
+          <PropertyRef Name="ItemID"/>
+        </Key>
+        <Property Name="ItemID" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="ItemName" Type="Edm.String"/>
+      </EntityType>
+    </Schema>
+    <Schema Namespace="ODataWebExperimental.Northwind.Model" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityContainer xmlns:p4="http://schemas.microsoft.com/ado/2009/02/edm/annotation" Name="NorthwindEntities" p4:LazyLoadingEnabled="true">
+        <EntitySet Name="Items" EntityType="NorthwindModel.Item" />
+      <EntitySet Name="OpenItems" EntityType="NorthwindModel.OpenItem" />
+      </EntityContainer>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>
