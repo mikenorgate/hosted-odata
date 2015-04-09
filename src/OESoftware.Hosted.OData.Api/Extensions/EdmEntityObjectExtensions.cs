@@ -29,50 +29,8 @@ namespace OESoftware.Hosted.OData.Api.Extensions
 
             foreach (var key in computedKeys)
             {
-                object value = null;
                 var keyName = string.Format("{0}.{1}", type.FullName(), key.Name);
-                switch (key.Type.Definition.FullTypeName())
-                {
-                    case EdmConstants.EdmInt16TypeName:
-                        {
-                            value = await gen.CreateInt16Key(request, keyName);
-                            break;
-                        }
-                    case EdmConstants.EdmInt32TypeName:
-                        {
-                            value = await gen.CreateInt32Key(request, keyName);
-                            break;
-                        }
-                    case EdmConstants.EdmInt64TypeName:
-                        {
-                            value = await gen.CreateInt64Key(request, keyName);
-                            break;
-                        }
-                    case EdmConstants.EdmDecimalTypeName:
-                        {
-                            value = await gen.CreateDecimalKey(request, keyName);
-                            break;
-                        }
-                    case EdmConstants.EdmDoubleTypeName:
-                        {
-                            value = await gen.CreateDoubleKey(request, keyName);
-                            break;
-                        }
-                    case EdmConstants.EdmGuidTypeName:
-                        {
-                            value = await gen.CreateGuidKey(request, keyName);
-                            break;
-                        }
-                    case EdmConstants.EdmSingleTypeName:
-                        {
-                            value = await gen.CreateSingleKey(request, keyName);
-                            break;
-                        }
-                    default:
-                        {
-                            throw new ApplicationException(string.Format("Unable to compute value of type {0}", key.Type.Definition.FullTypeName()));
-                        }
-                }
+                var value = gen.CreateKey(request, keyName, key.Type.Definition);
 
                 if (!obj.TrySetPropertyValue(key.Name, value))
                 {
@@ -82,5 +40,6 @@ namespace OESoftware.Hosted.OData.Api.Extensions
 
             return true;
         }
+        
     }
 }

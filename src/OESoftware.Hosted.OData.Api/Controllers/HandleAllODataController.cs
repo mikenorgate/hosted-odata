@@ -72,10 +72,6 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             await entity.SetComputedKeys(model, Request);
 
-            
-
-            //_db.Products.Add(product);
-            //await _db.SaveChangesAsync();
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
             if (dbIdentifier == null)
             {
@@ -112,12 +108,16 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             }
             //Each navigation property which doesn't have a link already in the document
             //Create an empty array to hold the ids
-            //TODO: post with navigation databind
             foreach (var property in entityType.DeclaredNavigationProperties())
             {
                 if (property.ReferentialConstraint == null)
                 {
                     doc.Add(new BsonElement(property.Name, new BsonArray()));
+                }
+                //Need to ignore any property which is linked to by a ReferentialConstraint
+                else
+                {
+                    property.ReferentialConstraint.PropertyPairs.ToList().ForEach(r=>doc.Remove(r.DependentProperty.Name));
                 }
             }
 

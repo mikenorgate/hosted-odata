@@ -122,6 +122,51 @@ namespace OESoftware.Hosted.OData.Api.Tests
             }
         }
 
+        [TestMethod]
+        public void CreateEntityInCollection_NavigationLink()
+        {
+            using (var client = new HttpClient())
+            {
+                // New code:
+                client.BaseAddress = new Uri("http://localhost:5000/5520f235c49d580c6c6c62f8/");
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                var sampleItem = SampleGenerator.CreateItem();
+
+                var req = new HttpRequestMessage(HttpMethod.Post, "ItemsWithCollectionNavigation")
+                {
+                    Content = new StringContent(sampleItem.ToString(), Encoding.UTF8, "application/json")
+                };
+                var response = client.SendAsync(req).Result;
+
+                Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
+
+                var locationHeader =
+                    response.Headers.FirstOrDefault(h => h.Key.Equals(HttpResponseHeader.Location.ToString()));
+
+                var r = new Regex(@"\(\d+\)", RegexOptions.IgnoreCase);
+                var id = r.Match(locationHeader.Value.First()).Value;
+
+                sampleItem.Add("ReferentialConstraint", 123);
+
+                req = new HttpRequestMessage(HttpMethod.Post, string.Format("ItemsWithCollectionNavigation{0}/Navigation", id))
+                {
+                    Content = new StringContent(sampleItem.ToString(), Encoding.UTF8, "application/json")
+                };
+                response = client.SendAsync(req).Result;
+
+                Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
+
+                locationHeader =
+                    response.Headers.FirstOrDefault(h => h.Key.Equals(HttpResponseHeader.Location.ToString()));
+                Assert.IsNotNull(locationHeader);
+
+                r = new Regex(string.Format(@"{0}ItemsWithCollectionNavigation{1}/Navigation\(\d+\)", client.BaseAddress, id.Replace("(", "\\(").Replace(")", "\\)")), RegexOptions.IgnoreCase);
+                Assert.IsTrue(r.IsMatch(locationHeader.Value.First()));
+            }
+        }
+
         #endregion
     }
 }

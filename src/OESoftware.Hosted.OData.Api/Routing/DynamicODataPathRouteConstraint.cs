@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
@@ -10,6 +11,10 @@ using System.Web.OData.Routing.Conventions;
 using Microsoft.OData.Core;
 using Microsoft.OData.Edm;
 using Microsoft.OData.Edm.Library;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using OESoftware.Hosted.OData.Api.DBHelpers;
+using OESoftware.Hosted.OData.Api.Extensions;
 using OESoftware.Hosted.OData.Api.Interfaces;
 
 namespace OESoftware.Hosted.OData.Api.Routing
@@ -100,6 +105,43 @@ namespace OESoftware.Hosted.OData.Api.Routing
             if (path == null)
             {
                 return false;
+            }
+
+            //If Path points to a property/operation on a single entity
+            //Check that the single entity exists
+            if (path.Segments.Count > 2)
+            {
+                var navProperty = path.Segments[0] as EntitySetPathSegment;
+                var collectionType = (IEdmCollectionType) navProperty.EntitySetBase.Type;
+                var key = navProperty.EntitySetBase.EntityType().DeclaredKey.FirstOrDefault();
+                if (key == null) return false;
+
+                var keyProperty = path.Segments[1] as KeyValuePathSegment;
+                var keys = keyProperty.ParseKeyValue(collectionType.ElementType.AsEntity());
+
+                //TODO: Currently do not support multiple keys
+                if (keys.Count != 1)
+                {
+                    return false;
+                }
+
+                var dbIdentifier = request.GetOwinEnvironment()["DbId"] as string;
+                if (dbIdentifier == null)
+                {
+                    throw new ApplicationException("Invalid DB identifier");
+                }
+
+                var dbConnection = DBConnectionFactory.Open(dbIdentifier);
+                var collection = dbConnection.GetCollection<BsonDocument>(collectionType.FullTypeName());
+
+                var existing = collection.FindAsync(
+                    new BsonDocumentFilterDefinition<BsonDocument>(
+                        new BsonDocument(new BsonElement("_id", BsonValue.Create(keys.Values.First())))), new FindOptions<BsonDocument>() {Limit = 1}).Result.ToListAsync().Result.FirstOrDefault();
+
+                if (existing == null)
+                {
+                    return false;
+                }
             }
 
             var odataProperties = request.ODataProperties();

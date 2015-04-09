@@ -79,6 +79,7 @@
     <Reference Include="Owin">
       <HintPath>..\..\packages\Owin.1.0\lib\net40\Owin.dll</HintPath>
     </Reference>
+    <Reference Include="System.Data.Entity" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Net.Http.Formatting, Version=5.2.3.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -125,9 +126,11 @@
     <Compile Include="Controllers\HandleAllODataController.cs" />
     <Compile Include="DBHelpers\DBConnectionFactory.cs" />
     <Compile Include="DBHelpers\EdmModelDBUpdates.cs" />
+    <Compile Include="DBHelpers\KeyParser.cs" />
     <Compile Include="DBHelpers\KeyGenerator.cs" />
     <Compile Include="EdmConstants.cs" />
     <Compile Include="Extensions\EdmEntityObjectExtensions.cs" />
+    <Compile Include="Extensions\KeyValuePathSegmentExtensions.cs" />
     <Compile Include="Interfaces\IModelProvider.cs" />
     <Compile Include="Middleware\ApiKeyValidation.cs" />
     <Compile Include="Models\Admin\Application.cs" />
