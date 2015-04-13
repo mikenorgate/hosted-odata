@@ -128,5 +128,13 @@ namespace OESoftware.Hosted.OData.Api
         internal const string EdmxName = "Edmx";
 
         #endregion
+
+        #region Paths
+
+        internal const string EntitySetPath = "~/entityset";
+
+        internal const string EntityNavigationPath = "~/entityset/key/navigation";
+
+        #endregion
     }
 }

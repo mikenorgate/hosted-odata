@@ -17,9 +17,13 @@ using Microsoft.OData.Edm;
 using Microsoft.OData.Edm.Library;
 using Microsoft.OData.Edm.Validation;
 using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
 using OESoftware.Hosted.OData.Api.DBHelpers;
 using OESoftware.Hosted.OData.Api.Extensions;
 using OESoftware.Hosted.OData.Api.Models;
+using OESoftware.Hosted.OData.Api.Attributes;
+using OESoftware.Hosted.OData.Api.DBHelpers.Commands;
 
 namespace OESoftware.Hosted.OData.Api.Controllers
 {
@@ -58,81 +62,157 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             }
         }
 
-        public async Task<IHttpActionResult> Post(EdmEntityObject entity)
+        [ODataPath(EdmConstants.EntitySetPath)]
+        public async Task<IHttpActionResult> PostCollection(EdmEntityObject entity)
         {
-            ODataPath path = Request.ODataProperties().Path;
-            IEdmCollectionType collectionType = (IEdmCollectionType)path.EdmType;
-            IEdmEntityTypeReference entityType = collectionType.ElementType.AsEntity();
-            var model = Request.ODataProperties().Model;
-
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
 
-            await entity.SetComputedKeys(model, Request);
+            var entityType = EntityTypeFromPath();
+            var command = await CreateInsertCommand(entity, entityType);
 
-            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            if (dbIdentifier == null)
+            var executor = new DbCommandExecutor();
+
+            await executor.Execute(command, Request);
+
+            entity = new EdmEntityObject(entityType);
+            foreach (var element in command.Result.Elements)
             {
-                throw new ApplicationException("Invalid DB identifier");
-            }
-
-            var dbConnection = DBConnectionFactory.Open(dbIdentifier);
-            var collection = dbConnection.GetCollection<BsonDocument>(collectionType.FullTypeName());
-
-            var keyName = "";
-            var edmStructuralProperty = entityType.Key().FirstOrDefault();
-            if (edmStructuralProperty != null)
-            {
-                keyName = edmStructuralProperty.Name;
-            }
-
-            var doc = new BsonDocument();
-            //Put each property into BsonDocument
-            foreach (var property in entityType.DeclaredStructuralProperties())
-            {
-                object value;
-                if (!entity.TryGetPropertyValue(property.Name, out value))
+                var name = element.Name;
+                if (name.Equals("_id"))
                 {
-                    value = property.DefaultValueString;
+                    name = entityType.DeclaredKey.First().Name;
                 }
-                var name = property.Name;
-                //If this is the key move it to _id 
-                //TODO: Support of multiple keys
-                if (name.Equals(keyName, StringComparison.InvariantCultureIgnoreCase))
-                {
-                    name = "_id";
-                }
-                doc.Add(new BsonElement(name, BsonValue.Create(value)));
+                entity.TrySetPropertyValue(name, BsonTypeMapper.MapToDotNetValue(element.Value));
             }
-            //Each navigation property which doesn't have a link already in the document
-            //Create an empty array to hold the ids
-            foreach (var property in entityType.DeclaredNavigationProperties())
-            {
-                if (property.ReferentialConstraint == null)
-                {
-                    doc.Add(new BsonElement(property.Name, new BsonArray()));
-                }
-                //Need to ignore any property which is linked to by a ReferentialConstraint
-                else
-                {
-                    property.ReferentialConstraint.PropertyPairs.ToList().ForEach(r=>doc.Remove(r.DependentProperty.Name));
-                }
-            }
-
-            if (entityType.IsOpen())
-            {
-                foreach (var property in entity.TryGetDynamicProperties())
-                {
-                    doc.Add(new BsonElement(property.Key, BsonValue.Create(property.Value)));
-                }
-            }
-
-
-            await collection.InsertOneAsync(doc);
 
             return Created(entity, entityType);
+        }
+
+        [ODataPath(EdmConstants.EntityNavigationPath)]
+        public async Task<IHttpActionResult> PostNavigation(EdmEntityObject entity)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var entityType = EntityTypeFromPath();
+            var insertCommand = await CreateInsertCommand(entity, entityType);
+
+            var executor = new DbCommandExecutor();
+
+            var path = Request.ODataProperties().Path;
+            var updates = CreateNavigationLink((path.Segments.Last() as NavigationPathSegment).NavigationProperty, entity, Request.Properties["BaseEntity"] as EdmEntityObject);
+
+            var commands = new List<IDbCommand<BsonDocument>>();
+            commands.Add(insertCommand);
+            commands.AddRange(updates);
+
+            await executor.Execute(commands, Request);
+
+            entity = new EdmEntityObject(entityType);
+            foreach (var element in insertCommand.Result.Elements)
+            {
+                var name = element.Name;
+                if (name.Equals("_id"))
+                {
+                    name = entityType.DeclaredKey.First().Name;
+                }
+                entity.TrySetPropertyValue(name, BsonTypeMapper.MapToDotNetValue(element.Value));
+            }
+
+            return Created(entity, entityType);
+        }
+
+        private IEnumerable<IDbCommand<BsonDocument>> CreateNavigationLink(IEdmNavigationProperty navigationProperty, EdmEntityObject obj1, EdmEntityObject obj2)
+        {
+            //Find the principal and get its key
+            IEdmNavigationProperty principalNav, dependantNav = null;
+            if (navigationProperty.IsPrincipal() || navigationProperty.Partner == null)
+            {
+                principalNav = navigationProperty;
+            }
+            else
+            {
+                principalNav = navigationProperty.Partner;
+            }
+
+            if (principalNav.Partner != null)
+            {
+                dependantNav = principalNav.Partner;
+            }
+
+            EdmEntityObject principalObject, dependantObject;
+            if (obj1.GetEdmType()
+                .FullName()
+                .Equals(principalNav.DeclaringType.FullTypeName(), StringComparison.InvariantCultureIgnoreCase))
+            {
+                principalObject = obj1;
+                dependantObject = obj2;
+            }
+            else
+            {
+                principalObject = obj2;
+                dependantObject = obj1;
+            }
+
+            object principalKey = null, dependantKey = null;
+            if (dependantNav != null)
+            {
+                principalObject.TryGetPropertyValue(dependantNav.ToEntityType().Key().First().Name,
+                    out principalKey);
+            }
+
+            //Get the key of the dependant
+            dependantObject.TryGetPropertyValue(principalNav.ToEntityType().Key().First().Name,
+                out dependantKey);
+
+            var results = new List<IDbCommand<BsonDocument>>();
+
+            results.Add(GetUpdate(principalNav, principalObject, dependantKey));
+            if (principalKey != null)
+            {
+                results.Add(GetUpdate(dependantNav, dependantObject, principalKey));
+            }
+
+            return results;
+        }
+
+        private static IDbCommand<BsonDocument> GetUpdate(IEdmNavigationProperty navigationProperty, EdmEntityObject navObject, object key)
+        {
+            object navKey = null;
+            var navKeyName = navigationProperty.DeclaringEntityType().DeclaredKey.First().Name;
+            navObject.TryGetPropertyValue(navKeyName, out navKey);
+            var filter = Builders<BsonDocument>.Filter.Eq("_id", navKey);
+
+            var updateBuilder = Builders<BsonDocument>.Update;
+            UpdateDefinition<BsonDocument> update = null;
+            //Add the dependant key to the principal
+            switch (ExtensionMethods.TargetMultiplicity(navigationProperty))
+            {
+                case EdmMultiplicity.Many:
+                    update = updateBuilder.AddToSet(navigationProperty.Name, key);
+                    break;
+                case EdmMultiplicity.One:
+                case EdmMultiplicity.ZeroOrOne:
+                case EdmMultiplicity.Unknown:
+                    var propertyToSet = navigationProperty.Name;
+                    if (navigationProperty.ReferentialConstraint != null)
+                    {
+                        var constraint = Enumerable.FirstOrDefault<EdmReferentialConstraintPropertyPair>(navigationProperty.ReferentialConstraint.PropertyPairs);
+                        if (constraint != null)
+                        {
+                            propertyToSet = constraint.DependentProperty.Name;
+                        }
+                    }
+                    update = updateBuilder.Set(propertyToSet, key);
+                    break;
+            }
+
+            return new DbUpdateCommand<BsonDocument>(string.Format("Collection({0})", navigationProperty.DeclaringType.FullTypeName()), filter, update);
         }
 
         private ODataQueryOptions GetODataQueryOptions(IEdmType edmType, IEdmModel model, ODataPath path)
@@ -143,7 +223,37 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             return queryOptions;
         }
 
-        protected CreatedODataResult<EdmEntityObject> Created(EdmEntityObject entity, IEdmEntityTypeReference entityType)
+        private async Task<DbInsertCommand<BsonDocument>> CreateInsertCommand(EdmEntityObject entity, IEdmEntityType entityType)
+        {
+            var model = Request.ODataProperties().Model;
+            var keysTask = entity.SetComputedKeys(model, Request);
+
+            await keysTask;
+
+            object key;
+            entity.TryGetPropertyValue(entityType.DeclaredKey.First().Name, out key);
+            var filter = Builders<BsonDocument>.Filter.Eq("_id", key);
+
+            return new DbInsertCommand<BsonDocument>(string.Format("Collection({0})", entityType.FullTypeName()), entity.ToInsertDocument(entityType), filter);
+        }
+
+        private IEdmEntityType EntityTypeFromPath()
+        {
+            var path = Request.ODataProperties().Path;
+            IEdmEntityType entityType = null;
+            if (path.EdmType is IEdmCollectionType)
+            {
+                var collectionType = (IEdmCollectionType)path.EdmType;
+                entityType = (IEdmEntityType)collectionType.ElementType.Definition;
+            }
+            else
+            {
+                entityType = (IEdmEntityType)path.EdmType;
+            }
+            return entityType;
+        }
+
+        protected CreatedODataResult<EdmEntityObject> Created(EdmEntityObject entity, IEdmEntityType entityType)
         {
             var path = Request.ODataProperties().Path;
             var currentSegments = path.Segments.ToList();

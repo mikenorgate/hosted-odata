@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http;
 using System.Web.Http;
 using System.Web.Http.Routing;
+using System.Web.OData;
 using System.Web.OData.Extensions;
 using System.Web.OData.Routing;
 using System.Web.OData.Routing.Conventions;
@@ -142,6 +143,20 @@ namespace OESoftware.Hosted.OData.Api.Routing
                 {
                     return false;
                 }
+
+                var entity = new EdmEntityObject(collectionType.ElementType.AsEntity());
+                foreach (var element in existing.Elements)
+                {
+                    var name = element.Name;
+                    if (name.Equals("_id"))
+                    {
+                        name = keys.Keys.First();
+                    }
+                    entity.TrySetPropertyValue(name, BsonTypeMapper.MapToDotNetValue(element.Value));
+                }
+
+                request.Properties.Add("BaseEntity", entity);
+                request.Properties.Add("BaseEntityKeys", keys);
             }
 
             var odataProperties = request.ODataProperties();

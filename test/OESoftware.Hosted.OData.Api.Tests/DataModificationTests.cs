@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -20,12 +21,14 @@ namespace OESoftware.Hosted.OData.Api.Tests
     public class DataModificationTests
     {
         private static IDisposable _webApp;
+        private static TestContext _context;
 
         [ClassInitialize]
         public static void ClassInitialize(TestContext context)
         {
             string baseUrl = "http://*:5000";
             _webApp = WebApp.Start<Startup>(baseUrl);
+            _context = context;
         }
 
         [ClassCleanup]
@@ -56,8 +59,13 @@ namespace OESoftware.Hosted.OData.Api.Tests
                 {
                     Content = new StringContent(sampleItem.ToString(), Encoding.UTF8, "application/json")
                 };
+                var stopwatch = new Stopwatch();
+                stopwatch.Start();
                 var response = client.SendAsync(req).Result;
-                
+                stopwatch.Stop();
+
+                _context.WriteLine("Request time: {0}", stopwatch.ElapsedMilliseconds);
+
                 Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
 
                 var locationHeader =
@@ -162,7 +170,7 @@ namespace OESoftware.Hosted.OData.Api.Tests
                     response.Headers.FirstOrDefault(h => h.Key.Equals(HttpResponseHeader.Location.ToString()));
                 Assert.IsNotNull(locationHeader);
 
-                r = new Regex(string.Format(@"{0}ItemsWithCollectionNavigation{1}/Navigation\(\d+\)", client.BaseAddress, id.Replace("(", "\\(").Replace(")", "\\)")), RegexOptions.IgnoreCase);
+                r = new Regex(string.Format(@"{0}ItemsWithReferentialConstraint\(\d+\)", client.BaseAddress), RegexOptions.IgnoreCase);
                 Assert.IsTrue(r.IsMatch(locationHeader.Value.First()));
             }
         }

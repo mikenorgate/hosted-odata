@@ -8,7 +8,7 @@
     </ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{08307EC1-39BE-4AFC-98C8-E3DA991EF6F9}</ProjectGuid>
-    <ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
+    <ProjectTypeGuids>{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>OESoftware.Hosted.OData.Api</RootNamespace>
@@ -119,13 +119,18 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Attributes\AnyKeyAuthorizeAttribute.cs" />
+    <Compile Include="Attributes\ODataPathAttribute.cs" />
     <Compile Include="Attributes\PrivateKeyAuthorizeAttribute.cs" />
     <Compile Include="Attributes\PublicKeyAuthorizeAttribute.cs" />
     <Compile Include="Controllers\AdminController.cs" />
     <Compile Include="Controllers\MetadataModifyController.cs" />
     <Compile Include="Controllers\HandleAllODataController.cs" />
+    <Compile Include="DBHelpers\Commands\DbInsertCommand.cs" />
+    <Compile Include="DBHelpers\Commands\DbUpdateCommand.cs" />
+    <Compile Include="DBHelpers\DbCommandExecutor.cs" />
     <Compile Include="DBHelpers\DBConnectionFactory.cs" />
     <Compile Include="DBHelpers\EdmModelDBUpdates.cs" />
+    <Compile Include="DBHelpers\IDbCommand.cs" />
     <Compile Include="DBHelpers\KeyParser.cs" />
     <Compile Include="DBHelpers\KeyGenerator.cs" />
     <Compile Include="EdmConstants.cs" />
@@ -162,27 +167,7 @@
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="'$(VSToolsPath)' != ''" />
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v10.0\WebApplications\Microsoft.WebApplication.targets" Condition="false" />
-  <ProjectExtensions>
-    <VisualStudio>
-      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
-        <WebProjectProperties>
-          <UseIIS>False</UseIIS>
-          <AutoAssignPort>True</AutoAssignPort>
-          <DevelopmentServerPort>62881</DevelopmentServerPort>
-          <DevelopmentServerVPath>/</DevelopmentServerVPath>
-          <IISUrl>http://localhost:62796/</IISUrl>
-          <NTLMAuthentication>False</NTLMAuthentication>
-          <UseCustomServer>True</UseCustomServer>
-          <CustomServerUrl>
-          </CustomServerUrl>
-          <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
-          <servers defaultServer="SelfHostServer">
-            <server name="SelfHostServer" exePath="" cmdArgs="" url="http://localhost:5000/" workingDir="" />
-          </servers>
-        </WebProjectProperties>
-      </FlavorProperties>
-    </VisualStudio>
-  </ProjectExtensions>
+  <ProjectExtensions />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
