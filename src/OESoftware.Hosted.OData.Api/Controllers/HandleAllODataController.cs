@@ -70,12 +70,20 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 return BadRequest(ModelState);
             }
 
+            var commands = new List<IDbCommand<BsonDocument>>();
             var entityType = EntityTypeFromPath();
             var command = await CreateInsertCommand(entity, entityType);
+            commands.Add(command);
+            await CreateNavigationCommands(entity, entityType, commands);
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
 
             var executor = new DbCommandExecutor();
 
-            await executor.Execute(command, Request);
+            await executor.Execute(commands, Request);
 
             entity = new EdmEntityObject(entityType);
             foreach (var element in command.Result.Elements)
@@ -90,6 +98,8 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             return Created(entity, entityType);
         }
+
+        
 
         [ODataPath(EdmConstants.EntityNavigationPath)]
         public async Task<IHttpActionResult> PostNavigation(EdmEntityObject entity)
@@ -125,6 +135,77 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             }
 
             return Created(entity, entityType);
+        }
+
+        private async Task CreateNavigationCommands(EdmEntityObject entity, IEdmEntityType entityType, List<IDbCommand<BsonDocument>> commands)
+        {
+            foreach (var navigationProperty in entityType.DeclaredNavigationProperties())
+            {
+                object navValue;
+                if (entity.TryGetPropertyValue(navigationProperty.Name, out navValue))
+                {
+                    if (navValue is EdmEntityObjectCollection)
+                    {
+                        var value = navValue as EdmEntityObjectCollection;
+                        foreach (var obj in value)
+                        {
+                            var objEntity = obj as EdmEntityObject;
+                            if (objEntity != null)
+                            {
+                                await CreateNavigationInsertCommand(entity, commands, objEntity, navigationProperty);
+                                await CreateNavigationCommands(objEntity, navigationProperty.DeclaringEntityType(), commands);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var objEntity = navValue as EdmEntityObject;
+                        if (objEntity != null)
+                        {
+                            await CreateNavigationInsertCommand(entity, commands, objEntity, navigationProperty);
+                            await
+                                CreateNavigationCommands(objEntity, navigationProperty.DeclaringEntityType(), commands);
+                        }
+                    }
+                }
+            }
+        }
+
+        private async Task CreateNavigationInsertCommand(EdmEntityObject entity, List<IDbCommand<BsonDocument>> commands, object navValue,
+            IEdmNavigationProperty navigationProperty)
+        {
+            IEdmEntityType type = null;
+            if (navigationProperty.Type.IsCollection())
+            {
+                type = (navigationProperty.Type as EdmCollectionTypeReference).ElementType().AsEntity().EntityDefinition();
+            }
+            else
+            {
+                type = navigationProperty.Type.AsEntity().EntityDefinition();
+            }
+
+            var value = navValue as EdmEntityObject;
+            if (value != null)
+            {
+                if (
+                    value.ActualEdmType.FullTypeName()
+                        .Equals(type.FullTypeName()))
+                {
+                    commands.Add(await CreateInsertCommand(value, type));
+                    commands.AddRange(CreateNavigationLink(navigationProperty, entity, value));
+                }
+                else
+                {
+                    ModelState.AddModelError(navigationProperty.Name,
+                        string.Format("Nested objects must be of type: {0}",
+                            type.FullTypeName()));
+                }
+            }
+            else
+            {
+                ModelState.AddModelError(navigationProperty.Name,
+                    string.Format("Nested objects must be of type: {0}", type.FullTypeName()));
+            }
         }
 
         private IEnumerable<IDbCommand<BsonDocument>> CreateNavigationLink(IEdmNavigationProperty navigationProperty, EdmEntityObject obj1, EdmEntityObject obj2)
