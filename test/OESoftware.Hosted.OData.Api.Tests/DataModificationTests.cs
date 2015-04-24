@@ -6,10 +6,12 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Web.OData;
 using Microsoft.Owin.Hosting;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json.Linq;
 using RestSharp;
+using Simple.OData.Client;
 
 namespace OESoftware.Hosted.OData.Api.Tests
 {
@@ -37,145 +39,81 @@ namespace OESoftware.Hosted.OData.Api.Tests
             _webApp.Dispose();
         }
 
-        // The region contains tests related to 11.4.2 Create an Entity
-        #region Create Entity
-
-        /// <summary>
-        /// 
-        /// </summary>
         [TestMethod]
-        public void CreateEntityInCollection()
+        public void CreateEntity_EntityIsCreated()
         {
-            using (var client = new HttpClient())
-            {
-                // New code:
-                client.BaseAddress = new Uri("http://localhost:5000/5520f235c49d580c6c6c62f8/");
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            var client = new ODataClient("http://localhost:5000/5520f235c49d580c6c6c62f8/");
+            
+            var guid1 = Guid.NewGuid();
+            var guid2 = Guid.NewGuid();
+            var entity = client
+                .For("EntityWithOneKey")
+                .Set(new { ItemGuid = guid1, NonComputed = guid2 })
+                .InsertEntryAsync().Result;
 
-                var sampleItem = SampleGenerator.CreateItem();
-
-                var req = new HttpRequestMessage(HttpMethod.Post, "Items")
-                {
-                    Content = new StringContent(sampleItem.ToString(), Encoding.UTF8, "application/json")
-                };
-                var stopwatch = new Stopwatch();
-                stopwatch.Start();
-                var response = client.SendAsync(req).Result;
-                stopwatch.Stop();
-
-                _context.WriteLine("Request time: {0}", stopwatch.ElapsedMilliseconds);
-
-                Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
-
-                var locationHeader =
-                    response.Headers.FirstOrDefault(h => h.Key.Equals(HttpResponseHeader.Location.ToString()));
-                Assert.IsNotNull(locationHeader);
-
-                var r = new Regex(string.Format(@"{0}Items\(\d+\)", client.BaseAddress), RegexOptions.IgnoreCase);
-                Assert.IsTrue(r.IsMatch(locationHeader.Value.First()));
-            }
+            Assert.AreEqual(guid1, (Guid)entity["ItemGuid"]);
+            Assert.AreEqual(guid2, (Guid)entity["NonComputed"]);
+            Assert.IsTrue((int)entity["ItemId"] > 0);
         }
 
         [TestMethod]
-        public void CreateEntityInCollection_FailsIfExtraPropertiesOnNonOpenType()
+        public void UpdateEntity_EntityIsUpdated()
         {
-            using (var client = new HttpClient())
-            {
-                // New code:
-                client.BaseAddress = new Uri("http://localhost:5000/5520f235c49d580c6c6c62f8/");
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            var client = new ODataClient("http://localhost:5000/5520f235c49d580c6c6c62f8/");
 
-                var sampleItem = SampleGenerator.CreateItem();
-                sampleItem.Add("NewProperty", new JValue("test"));
+            var guid1 = Guid.NewGuid();
+            var guid2 = Guid.NewGuid();
+            var entity = client
+                .For("EntityWithOneKey")
+                .Set(new { ItemGuid = guid1, NonComputed = guid2 })
+                .InsertEntryAsync().Result;
 
-                var req = new HttpRequestMessage(HttpMethod.Post, "Items")
-                {
-                    Content = new StringContent(sampleItem.ToString(), Encoding.UTF8, "application/json")
-                };
-                var response = client.SendAsync(req).Result;
+            var guid3 = Guid.NewGuid();
+            var updated = client
+                .For("EntityWithOneKey")
+                .Key((int)entity["ItemId"])
+                .Set(new { ItemGuid = guid3 })
+                .UpdateEntryAsync().Result;
 
-                Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
-            }
+            Assert.AreEqual(guid3, (Guid)updated["ItemGuid"]);
+            Assert.AreEqual(guid2, (Guid)updated["NonComputed"]);
+            Assert.AreEqual((int)entity["ItemId"], (int)updated["ItemId"]);
         }
 
         [TestMethod]
-        public void CreateEntityInCollection_OpenType()
+        public void DeleteEntity_EntityIsDeleted()
         {
-            using (var client = new HttpClient())
+            var client = new ODataClient("http://localhost:5000/5520f235c49d580c6c6c62f8/");
+
+            var guid1 = Guid.NewGuid();
+            var guid2 = Guid.NewGuid();
+            var entity = client
+                .For("EntityWithOneKey")
+                .Set(new { ItemGuid = guid1, NonComputed = guid2 })
+                .InsertEntryAsync().Result;
+            
+            client
+                .For("EntityWithOneKey")
+                .Key((int)entity["ItemId"])
+                .DeleteEntryAsync().Wait();
+
+            try
             {
-                // New code:
-                client.BaseAddress = new Uri("http://localhost:5000/5520f235c49d580c6c6c62f8/");
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                client
+                    .For("EntityWithOneKey")
+                    .Key((int) entity["ItemId"])
+                    .FindEntryAsync().Wait();
+            }
+            catch (AggregateException e)
+            {
+                var i = e.InnerException as AggregateException;
+                Assert.IsNotNull(i);
+                var w = i.InnerException as WebRequestException;
+                Assert.IsNotNull(w);
 
-                var sampleItem = SampleGenerator.CreateItem();
-                sampleItem.Add("NewProperty", new JValue("test"));
-
-                var req = new HttpRequestMessage(HttpMethod.Post, "OpenItems")
-                {
-                    Content = new StringContent(sampleItem.ToString(), Encoding.UTF8, "application/json")
-                };
-                var response = client.SendAsync(req).Result;
-
-                Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
-
-                var locationHeader =
-                    response.Headers.FirstOrDefault(h => h.Key.Equals(HttpResponseHeader.Location.ToString()));
-                Assert.IsNotNull(locationHeader);
-
-                var r = new Regex(string.Format(@"{0}OpenItems\(\d+\)", client.BaseAddress), RegexOptions.IgnoreCase);
-                Assert.IsTrue(r.IsMatch(locationHeader.Value.First()));
+                Assert.AreEqual(HttpStatusCode.NotFound, w.Code);
             }
         }
-
-        [TestMethod]
-        public void CreateEntityInCollection_NavigationLink()
-        {
-            using (var client = new HttpClient())
-            {
-                // New code:
-                client.BaseAddress = new Uri("http://localhost:5000/5520f235c49d580c6c6c62f8/");
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                var sampleItem = SampleGenerator.CreateItem();
-
-                var req = new HttpRequestMessage(HttpMethod.Post, "ItemsWithCollectionNavigation")
-                {
-                    Content = new StringContent(sampleItem.ToString(), Encoding.UTF8, "application/json")
-                };
-                var response = client.SendAsync(req).Result;
-
-                Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
-
-                var locationHeader =
-                    response.Headers.FirstOrDefault(h => h.Key.Equals(HttpResponseHeader.Location.ToString()));
-
-                var r = new Regex(@"\(\d+\)", RegexOptions.IgnoreCase);
-                var id = r.Match(locationHeader.Value.First()).Value;
-
-                sampleItem.Add("ReferentialConstraint", 123);
-
-                req = new HttpRequestMessage(HttpMethod.Post, string.Format("ItemsWithCollectionNavigation{0}/Navigation", id))
-                {
-                    Content = new StringContent(sampleItem.ToString(), Encoding.UTF8, "application/json")
-                };
-                response = client.SendAsync(req).Result;
-
-                Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
-
-                locationHeader =
-                    response.Headers.FirstOrDefault(h => h.Key.Equals(HttpResponseHeader.Location.ToString()));
-                Assert.IsNotNull(locationHeader);
-
-                r = new Regex(string.Format(@"{0}ItemsWithReferentialConstraint\(\d+\)", client.BaseAddress), RegexOptions.IgnoreCase);
-                Assert.IsTrue(r.IsMatch(locationHeader.Value.First()));
-            }
-        }
-
-        #endregion
     }
 }
 

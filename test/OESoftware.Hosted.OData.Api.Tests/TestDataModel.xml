@@ -5,58 +5,69 @@
   </edmx:Reference>
   <edmx:DataServices>
     <Schema Namespace="NorthwindModel" xmlns="http://docs.oasis-open.org/odata/ns/edm">
-      <EntityType Name="Item">
+      <EntityType Name="EntityWithOnlyComputedKeys">
         <Key>
-          <PropertyRef Name="ItemID"/>
+          <PropertyRef Name="ItemId"/>
+          <PropertyRef Name="ItemGuid"/>
         </Key>
-        <Property Name="ItemID" Type="Edm.Int32" Nullable="false">
+        <Property Name="ItemId" Type="Edm.Int32" Nullable="false">
           <Annotation Term="Core.Computed" Bool="true" />
         </Property>
-        <Property Name="ItemName" Type="Edm.String"/>
+        <Property Name="ItemGuid" Type="Edm.Guid" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
       </EntityType>
-      <EntityType Name="OpenItem" OpenType="true">
+
+      <EntityType Name="EntityWithMixedKeys">
         <Key>
-          <PropertyRef Name="ItemID"/>
+          <PropertyRef Name="ItemId"/>
+          <PropertyRef Name="ItemGuid"/>
+          <PropertyRef Name="NonComputed"/>
         </Key>
-        <Property Name="ItemID" Type="Edm.Int32" Nullable="false">
+        <Property Name="ItemId" Type="Edm.Int32" Nullable="false">
           <Annotation Term="Core.Computed" Bool="true" />
         </Property>
-        <Property Name="ItemName" Type="Edm.String"/>
+        <Property Name="ItemGuid" Type="Edm.Guid" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="NonComputed" Type="Edm.Guid" Nullable="false">
+        </Property>
       </EntityType>
-      <EntityType Name="ItemWithCollectionNavigation">
-        <Key>
-          <PropertyRef Name="ItemID"/>
-        </Key>
-        <Property Name="ItemID" Type="Edm.Int32" Nullable="false">
+      
+      <EntityType Name="EntityMixedProperties">
+        <Property Name="ItemId" Type="Edm.Int32" Nullable="false">
           <Annotation Term="Core.Computed" Bool="true" />
         </Property>
-        <Property Name="ItemName" Type="Edm.String"/>
-        <NavigationProperty Name="Navigation" Type="Collection(NorthwindModel.ItemWithReferentialConstraint)" Partner="Item" />
+        <Property Name="ItemGuid" Type="Edm.Guid" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="NonComputed" Type="Edm.Guid" Nullable="false">
+        </Property>
       </EntityType>
-      <EntityType Name="ItemWithReferentialConstraint">
+      
+      <EntityType Name="OpenEntity" OpenType="true">
+      </EntityType>
+
+      
+      <EntityType Name="EntityWithOneKey">
         <Key>
-          <PropertyRef Name="ItemID"/>
+          <PropertyRef Name="ItemId"/>
         </Key>
-        <Property Name="ItemID" Type="Edm.Int32" Nullable="false">
+        <Property Name="ItemId" Type="Edm.Int32" Nullable="false">
           <Annotation Term="Core.Computed" Bool="true" />
         </Property>
-        <Property Name="ItemName" Type="Edm.String"/>
-        <Property Name="ReferentialConstraint" Type="Edm.Int32"/>
-        <NavigationProperty Name="Item" Type="NorthwindModel.ItemWithCollectionNavigation" Partner="Navigation">
-          <ReferentialConstraint Property="ReferentialConstraint" ReferencedProperty="ItemID"/>
-        </NavigationProperty>
+        <Property Name="ItemGuid" Type="Edm.Guid" Nullable="false">
+        </Property>
+        <Property Name="NonComputed" Type="Edm.Guid" Nullable="false">
+        </Property>
       </EntityType>
     </Schema>
     <Schema Namespace="ODataWebExperimental.Northwind.Model" xmlns="http://docs.oasis-open.org/odata/ns/edm">
       <EntityContainer xmlns:p4="http://schemas.microsoft.com/ado/2009/02/edm/annotation" Name="NorthwindEntities" p4:LazyLoadingEnabled="true">
-        <EntitySet Name="Items" EntityType="NorthwindModel.Item" />
-        <EntitySet Name="OpenItems" EntityType="NorthwindModel.OpenItem" />
-        <EntitySet Name="ItemsWithCollectionNavigation" EntityType="NorthwindModel.ItemWithCollectionNavigation">
-          <NavigationPropertyBinding Path="Navigation" Target="ItemsWithReferentialConstraint"/>
-        </EntitySet>
-        <EntitySet Name="ItemsWithReferentialConstraint" EntityType="NorthwindModel.ItemWithReferentialConstraint">
-          <NavigationPropertyBinding Path="Item" Target="ItemsWithCollectionNavigation"/>
-        </EntitySet>
+        <EntitySet Name="EntityWithOnlyComputedKeys" EntityType="NorthwindModel.EntityWithOnlyComputedKeys" />
+        <EntitySet Name="EntityWithMixedKeys" EntityType="NorthwindModel.EntityWithMixedKeys" />
+        <EntitySet Name="EntityMixedProperties" EntityType="NorthwindModel.EntityMixedProperties" />
+        <EntitySet Name="EntityWithOneKey" EntityType="NorthwindModel.EntityWithOneKey" />
       </EntityContainer>
     </Schema>
   </edmx:DataServices>

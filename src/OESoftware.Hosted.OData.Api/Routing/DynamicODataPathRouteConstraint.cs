@@ -108,57 +108,6 @@ namespace OESoftware.Hosted.OData.Api.Routing
                 return false;
             }
 
-            //If Path points to a property/operation on a single entity
-            //Check that the single entity exists
-            if (path.Segments.Count > 2)
-            {
-                var navProperty = path.Segments[0] as EntitySetPathSegment;
-                var collectionType = (IEdmCollectionType) navProperty.EntitySetBase.Type;
-                var key = navProperty.EntitySetBase.EntityType().DeclaredKey.FirstOrDefault();
-                if (key == null) return false;
-
-                var keyProperty = path.Segments[1] as KeyValuePathSegment;
-                var keys = keyProperty.ParseKeyValue(collectionType.ElementType.AsEntity());
-
-                //TODO: Currently do not support multiple keys
-                if (keys.Count != 1)
-                {
-                    return false;
-                }
-
-                var dbIdentifier = request.GetOwinEnvironment()["DbId"] as string;
-                if (dbIdentifier == null)
-                {
-                    throw new ApplicationException("Invalid DB identifier");
-                }
-
-                var dbConnection = DBConnectionFactory.Open(dbIdentifier);
-                var collection = dbConnection.GetCollection<BsonDocument>(collectionType.FullTypeName());
-
-                var existing = collection.FindAsync(
-                    new BsonDocumentFilterDefinition<BsonDocument>(
-                        new BsonDocument(new BsonElement("_id", BsonValue.Create(keys.Values.First())))), new FindOptions<BsonDocument>() {Limit = 1}).Result.ToListAsync().Result.FirstOrDefault();
-
-                if (existing == null)
-                {
-                    return false;
-                }
-
-                var entity = new EdmEntityObject(collectionType.ElementType.AsEntity());
-                foreach (var element in existing.Elements)
-                {
-                    var name = element.Name;
-                    if (name.Equals("_id"))
-                    {
-                        name = keys.Keys.First();
-                    }
-                    entity.TrySetPropertyValue(name, BsonTypeMapper.MapToDotNetValue(element.Value));
-                }
-
-                request.Properties.Add("BaseEntity", entity);
-                request.Properties.Add("BaseEntityKeys", keys);
-            }
-
             var odataProperties = request.ODataProperties();
             odataProperties.Model = model;
             odataProperties.PathHandler = PathHandler;

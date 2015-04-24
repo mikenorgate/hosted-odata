@@ -12,26 +12,30 @@ namespace OESoftware.Hosted.OData.Api.DBHelpers.Commands
     {
         public string CollectionName { get; private set; }
 
-        private readonly T _document;
+        public T Document { get; private set; }
 
-        private readonly FilterDefinition<T> _filterDefinition;
+        public FilterDefinition<T> FilterDefinition { get; private set; }
 
         public T Result { get; private set; }
 
         public DbInsertCommand(string collectionName, T document, FilterDefinition<T> filterDefinition)
         {
             CollectionName = collectionName;
-            _document = document;
-            _filterDefinition = filterDefinition;
+            Document = document;
+            FilterDefinition = filterDefinition;
         }
 
         public async Task Execute(IMongoCollection<T> collection)
         {
-            await collection.InsertOneAsync(_document);
+            await collection.InsertOneAsync(Document);
 
-            Result =
-                (await (await collection.FindAsync(_filterDefinition, new FindOptions<T>() {Limit = 1})).ToListAsync())
-                    .FirstOrDefault();
+            if (FilterDefinition != null)
+            {
+                Result =
+                    (await
+                        (await collection.FindAsync(FilterDefinition, new FindOptions<T>() {Limit = 1})).ToListAsync())
+                        .FirstOrDefault();
+            }
         }
     }
 }

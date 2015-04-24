@@ -10,7 +10,7 @@ namespace OESoftware.Hosted.OData.Api.Extensions
 {
     public static class KeyValuePathSegmentExtensions
     {
-        public static IDictionary<string, object> ParseKeyValue(this KeyValuePathSegment keyValuePathSegment, IEdmEntityTypeReference entityType)
+        public static IDictionary<string, object> ParseKeyValue(this KeyValuePathSegment keyValuePathSegment, IEdmEntityType entityType)
         {
             var result = new Dictionary<string, object>();
             if (string.IsNullOrEmpty(keyValuePathSegment.Value)) return result;

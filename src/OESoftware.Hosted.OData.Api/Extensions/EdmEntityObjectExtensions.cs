@@ -31,7 +31,7 @@ namespace OESoftware.Hosted.OData.Api.Extensions
             foreach (var key in computedKeys)
             {
                 var keyName = string.Format("{0}.{1}", type.FullName(), key.Name);
-                var value = await gen.CreateKey(request, keyName, key.Type.Definition);
+                var value = await gen.CreateKey("", keyName, key.Type.Definition);
 
                 if (!obj.TrySetPropertyValue(key.Name, value))
                 {

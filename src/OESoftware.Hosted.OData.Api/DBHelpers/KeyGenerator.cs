@@ -11,46 +11,46 @@ using OESoftware.Hosted.OData.Api.Models;
 
 namespace OESoftware.Hosted.OData.Api.DBHelpers
 {
-    public class KeyGenerator
+    public class KeyGenerator : IKeyGenerator
     {
-        public async Task<object> CreateKey(HttpRequestMessage request, string keyName, IEdmType type)
+        public async Task<object> CreateKey(string dbIdentifier, string keyName, IEdmType type)
         {
             object value = null;
             switch (type.FullTypeName())
             {
                 case EdmConstants.EdmInt16TypeName:
                     {
-                        value = await CreateInt16Key(request, keyName);
+                        value = await CreateInt16Key(dbIdentifier, keyName);
                         break;
                     }
                 case EdmConstants.EdmInt32TypeName:
                     {
-                        value = await CreateInt32Key(request, keyName);
+                        value = await CreateInt32Key(dbIdentifier, keyName);
                         break;
                     }
                 case EdmConstants.EdmInt64TypeName:
                     {
-                        value = await CreateInt64Key(request, keyName);
+                        value = await CreateInt64Key(dbIdentifier, keyName);
                         break;
                     }
                 case EdmConstants.EdmDecimalTypeName:
                     {
-                        value = await CreateDecimalKey(request, keyName);
+                        value = await CreateDecimalKey(dbIdentifier, keyName);
                         break;
                     }
                 case EdmConstants.EdmDoubleTypeName:
                     {
-                        value = await CreateDoubleKey(request, keyName);
+                        value = await CreateDoubleKey(dbIdentifier, keyName);
                         break;
                     }
                 case EdmConstants.EdmGuidTypeName:
                     {
-                        value = await CreateGuidKey(request, keyName);
+                        value = await CreateGuidKey(dbIdentifier, keyName);
                         break;
                     }
                 case EdmConstants.EdmSingleTypeName:
                     {
-                        value = await CreateSingleKey(request, keyName);
+                        value = await CreateSingleKey(dbIdentifier, keyName);
                         break;
                     }
                 default:
@@ -62,44 +62,43 @@ namespace OESoftware.Hosted.OData.Api.DBHelpers
             return value;
         }
 
-        private async Task<Int16> CreateInt16Key(HttpRequestMessage request, string keyName)
+        private async Task<Int16> CreateInt16Key(string dbIdentifier, string keyName)
         {
-            return (Int16)(await GetNextFromCounters(request, keyName, (Int16) 1));
+            return (Int16)(await GetNextFromCounters(dbIdentifier, keyName, (Int16) 1));
         }
 
-        private async Task<Int32> CreateInt32Key(HttpRequestMessage request, string keyName)
+        private async Task<Int32> CreateInt32Key(string dbIdentifier, string keyName)
         {
-            return (Int32)(await GetNextFromCounters(request, keyName, (Int32)1));
+            return (Int32)(await GetNextFromCounters(dbIdentifier, keyName, (Int32)1));
         }
 
-        private async Task<Int64> CreateInt64Key(HttpRequestMessage request, string keyName)
+        private async Task<Int64> CreateInt64Key(string dbIdentifier, string keyName)
         {
-            return (Int64)(await GetNextFromCounters(request, keyName, (Int64)1));
+            return (Int64)(await GetNextFromCounters(dbIdentifier, keyName, (Int64)1));
         }
 
-        private async Task<Decimal> CreateDecimalKey(HttpRequestMessage request, string keyName)
+        private async Task<Decimal> CreateDecimalKey(string dbIdentifier, string keyName)
         {
-            return (Decimal)(await GetNextFromCounters(request, keyName, (Decimal)1.0));
+            return (Decimal)(await GetNextFromCounters(dbIdentifier, keyName, (Decimal)1.0));
         }
 
-        private async Task<Double> CreateDoubleKey(HttpRequestMessage request, string keyName)
+        private async Task<Double> CreateDoubleKey(string dbIdentifier, string keyName)
         {
-            return (Double)(await GetNextFromCounters(request, keyName, (Double)1.0));
+            return (Double)(await GetNextFromCounters(dbIdentifier, keyName, (Double)1.0));
         }
 
-        private async Task<Guid> CreateGuidKey(HttpRequestMessage request, string keyName)
+        private async Task<Guid> CreateGuidKey(string dbIdentifier, string keyName)
         {
             return Guid.NewGuid();
         }
 
-        private async Task<Single> CreateSingleKey(HttpRequestMessage request, string keyName)
+        private async Task<Single> CreateSingleKey(string dbIdentifier, string keyName)
         {
-            return (Single)(await GetNextFromCounters(request, keyName, (Single)1.0));
+            return (Single)(await GetNextFromCounters(dbIdentifier, keyName, (Single)1.0));
         }
 
-        private async Task<object> GetNextFromCounters(HttpRequestMessage request, string keyName, object increment)
+        private async Task<object> GetNextFromCounters(string dbIdentifier, string keyName, object increment)
         {
-            var dbIdentifier = request.GetOwinEnvironment()["DbId"] as string;
             if (dbIdentifier == null)
             {
                 throw new ApplicationException("Invalid DB identifier");

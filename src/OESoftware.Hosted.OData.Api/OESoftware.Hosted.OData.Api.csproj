@@ -125,12 +125,16 @@
     <Compile Include="Controllers\AdminController.cs" />
     <Compile Include="Controllers\MetadataModifyController.cs" />
     <Compile Include="Controllers\HandleAllODataController.cs" />
+    <Compile Include="DBHelpers\Commands\DbFindCommand.cs" />
     <Compile Include="DBHelpers\Commands\DbInsertCommand.cs" />
+    <Compile Include="DBHelpers\Commands\DbDeleteCommand.cs" />
     <Compile Include="DBHelpers\Commands\DbUpdateCommand.cs" />
     <Compile Include="DBHelpers\DbCommandExecutor.cs" />
+    <Compile Include="DBHelpers\DbCommandFactory.cs" />
     <Compile Include="DBHelpers\DBConnectionFactory.cs" />
     <Compile Include="DBHelpers\EdmModelDBUpdates.cs" />
     <Compile Include="DBHelpers\IDbCommand.cs" />
+    <Compile Include="DBHelpers\IKeyGenerator.cs" />
     <Compile Include="DBHelpers\KeyParser.cs" />
     <Compile Include="DBHelpers\KeyGenerator.cs" />
     <Compile Include="EdmConstants.cs" />
