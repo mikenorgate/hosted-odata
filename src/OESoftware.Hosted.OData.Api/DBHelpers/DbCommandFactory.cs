@@ -11,6 +11,8 @@ using System.Web.OData;
 using Microsoft.OData.Edm;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using OESoftware.Hosted.OData.Api.Db;
+using OESoftware.Hosted.OData.Api.Db.Couchbase.Commands;
 using OESoftware.Hosted.OData.Api.DBHelpers.Commands;
 
 namespace OESoftware.Hosted.OData.Api.DBHelpers
@@ -30,6 +32,12 @@ namespace OESoftware.Hosted.OData.Api.DBHelpers
         {
             _dbIdentifier = dbIdentifier;
             _keyGenerator = keyGenerator;
+        }
+
+        public async Task<IDbCommand> CreateInsertCommandNew(EdmEntityObject entity,
+            IEdmEntityType entityType)
+        {
+            return new InsertCommand(entity, entityType);
         }
 
         public async Task<IEnumerable<IDbCommand<BsonDocument>>> CreateInsertCommand(EdmEntityObject entity, IEdmEntityType entityType, IEdmModel model)

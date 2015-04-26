@@ -43,7 +43,7 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\packages\Microsoft.OData.Core.6.10.0\lib\portable-net40+sl5+wp8+win8+wpa\Microsoft.OData.Core.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.OData.Edm, Version=6.10.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+    <Reference Include="Microsoft.OData.Edm, Version=6.11.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\packages\Microsoft.OData.Edm.6.10.0\lib\portable-net40+sl5+wp8+win8+wpa\Microsoft.OData.Edm.dll</HintPath>
     </Reference>
@@ -160,7 +160,23 @@
   <ItemGroup>
     <Content Include="packages.config" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OESoftware.Hosted.OData.Api.Core\OESoftware.Hosted.OData.Api.Core.csproj">
+      <Project>{6fc272f8-43a8-4f46-9b47-105d485c2687}</Project>
+      <Name>OESoftware.Hosted.OData.Api.Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OESoftware.Hosted.OData.Api.Db.Couchbase\OESoftware.Hosted.OData.Api.Db.Couchbase.csproj">
+      <Project>{73b820f5-5640-48f6-a353-f46df9730274}</Project>
+      <Name>OESoftware.Hosted.OData.Api.Db.Couchbase</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OESoftware.Hosted.OData.Api.Db\OESoftware.Hosted.OData.Api.Db.csproj">
+      <Project>{a9cb03d3-f3ea-41bd-84ce-2f3e1c3bfa50}</Project>
+      <Name>OESoftware.Hosted.OData.Api.Db</Name>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>

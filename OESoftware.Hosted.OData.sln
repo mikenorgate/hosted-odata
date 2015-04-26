@@ -11,6 +11,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OESoftware.Hosted.OData.Api
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OESoftware.Hosted.OData.Api.Tests", "test\OESoftware.Hosted.OData.Api.Tests\OESoftware.Hosted.OData.Api.Tests.csproj", "{67901662-A9CD-4D4D-A7BF-FC01BC27EA72}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OESoftware.Hosted.OData.Api.Db.Couchbase", "src\OESoftware.Hosted.OData.Api.Db.Couchbase\OESoftware.Hosted.OData.Api.Db.Couchbase.csproj", "{73B820F5-5640-48F6-A353-F46DF9730274}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OESoftware.Hosted.OData.Api.Db", "src\OESoftware.Hosted.OData.Api.Db\OESoftware.Hosted.OData.Api.Db.csproj", "{A9CB03D3-F3EA-41BD-84CE-2F3E1C3BFA50}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OESoftware.Hosted.OData.Api.Core", "src\OESoftware.Hosted.OData.Api.Core\OESoftware.Hosted.OData.Api.Core.csproj", "{6FC272F8-43A8-4F46-9B47-105D485C2687}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		CodeAnalysis|Any CPU = CodeAnalysis|Any CPU
@@ -30,11 +36,32 @@ Global
 		{67901662-A9CD-4D4D-A7BF-FC01BC27EA72}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{67901662-A9CD-4D4D-A7BF-FC01BC27EA72}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{67901662-A9CD-4D4D-A7BF-FC01BC27EA72}.Release|Any CPU.Build.0 = Release|Any CPU
+		{73B820F5-5640-48F6-A353-F46DF9730274}.CodeAnalysis|Any CPU.ActiveCfg = Release|Any CPU
+		{73B820F5-5640-48F6-A353-F46DF9730274}.CodeAnalysis|Any CPU.Build.0 = Release|Any CPU
+		{73B820F5-5640-48F6-A353-F46DF9730274}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73B820F5-5640-48F6-A353-F46DF9730274}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73B820F5-5640-48F6-A353-F46DF9730274}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73B820F5-5640-48F6-A353-F46DF9730274}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9CB03D3-F3EA-41BD-84CE-2F3E1C3BFA50}.CodeAnalysis|Any CPU.ActiveCfg = Release|Any CPU
+		{A9CB03D3-F3EA-41BD-84CE-2F3E1C3BFA50}.CodeAnalysis|Any CPU.Build.0 = Release|Any CPU
+		{A9CB03D3-F3EA-41BD-84CE-2F3E1C3BFA50}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9CB03D3-F3EA-41BD-84CE-2F3E1C3BFA50}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9CB03D3-F3EA-41BD-84CE-2F3E1C3BFA50}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9CB03D3-F3EA-41BD-84CE-2F3E1C3BFA50}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6FC272F8-43A8-4F46-9B47-105D485C2687}.CodeAnalysis|Any CPU.ActiveCfg = Release|Any CPU
+		{6FC272F8-43A8-4F46-9B47-105D485C2687}.CodeAnalysis|Any CPU.Build.0 = Release|Any CPU
+		{6FC272F8-43A8-4F46-9B47-105D485C2687}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6FC272F8-43A8-4F46-9B47-105D485C2687}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6FC272F8-43A8-4F46-9B47-105D485C2687}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6FC272F8-43A8-4F46-9B47-105D485C2687}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{08307EC1-39BE-4AFC-98C8-E3DA991EF6F9} = {55FC9733-B0A6-4E3C-BB80-F032BF75CF00}
+		{73B820F5-5640-48F6-A353-F46DF9730274} = {55FC9733-B0A6-4E3C-BB80-F032BF75CF00}
+		{A9CB03D3-F3EA-41BD-84CE-2F3E1C3BFA50} = {55FC9733-B0A6-4E3C-BB80-F032BF75CF00}
+		{6FC272F8-43A8-4F46-9B47-105D485C2687} = {55FC9733-B0A6-4E3C-BB80-F032BF75CF00}
 	EndGlobalSection
 EndGlobal

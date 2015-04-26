@@ -23,6 +23,7 @@ using OESoftware.Hosted.OData.Api.DBHelpers;
 using OESoftware.Hosted.OData.Api.Extensions;
 using OESoftware.Hosted.OData.Api.Models;
 using OESoftware.Hosted.OData.Api.Attributes;
+using OESoftware.Hosted.OData.Api.Db;
 using OESoftware.Hosted.OData.Api.DBHelpers.Commands;
 
 namespace OESoftware.Hosted.OData.Api.Controllers
@@ -38,23 +39,21 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var keyProperty = path.Segments[1] as KeyValuePathSegment;
             var keys = keyProperty.ParseKeyValue(entityType);
 
-            var executor = new DbCommandExecutor();
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var commandFactory = new DbCommandFactory(dbIdentifier);
-
-
-            var commands = await commandFactory.CreateGetCommand(keys, entityType);
-
-            await executor.Execute(commands, Request);
-
-            var command = commands.First() as DbFindCommand<BsonDocument>;
-            var results = await command.Result.ToListAsync();
-            if (results.Count != 1)
+            var command = new Db.Couchbase.Commands.GetCommand(keys, entityType);
+            try
             {
-                return NotFound();
+                var result = await command.Execute(dbIdentifier);
+                return Ok(result);
             }
-
-            return Ok(results.First());
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
         }
 
         [ODataPath(EdmConstants.EntitySetPath)]
@@ -65,17 +64,33 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 return BadRequest(ModelState);
             }
 
-            var executor = new DbCommandExecutor();
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
             var commandFactory = new DbCommandFactory(dbIdentifier);
 
             var entityType = EntityTypeFromPath();
-            var commands = await commandFactory.CreateInsertCommand(entity, entityType,
-                Request.ODataProperties().Model);
+            var model = Request.ODataProperties().Model;
+            var keyGen = new Db.Couchbase.KeyGenerator();
+            var tasks = (from key in entityType.DeclaredKey.Where(k => k.VocabularyAnnotations(model).Any(v => v.Term.FullName() == Microsoft.OData.Edm.Vocabularies.V1.CoreVocabularyConstants.Computed))
+                         let key1 = key select keyGen.CreateKey(dbIdentifier, key.Name, key.Type.Definition).ContinueWith((task) => { entity.TrySetPropertyValue(key1.Name, task.Result); })).ToList();
 
-            await executor.Execute(commands, Request);
+            await Task.WhenAll(tasks);
 
-            return Created(entity, entityType);
+            try
+            {
+                var command = await commandFactory.CreateInsertCommandNew(entity, entityType);
+
+                await command.Execute(dbIdentifier);
+
+                return Created(entity, entityType);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
         }
 
         [ODataPath(EdmConstants.EntityPath)]
@@ -91,18 +106,24 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var path = Request.ODataProperties().Path;
             var keyProperty = path.Segments[1] as KeyValuePathSegment;
             var keys = keyProperty.ParseKeyValue(entityType);
-
-            var executor = new DbCommandExecutor();
+            
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var commandFactory = new DbCommandFactory(dbIdentifier);
 
+            var command = new Db.Couchbase.Commands.UpdateCommand(keys, entity, entityType);
+            try
+            {
+                var result = await command.Execute(dbIdentifier);
 
-            var commands = await commandFactory.CreateUpdateCommand(keys, entity, entityType,
-                Request.ODataProperties().Model, false);
-
-            await executor.Execute(commands, Request);
-
-            return Updated(entity);
+                return Updated(result);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
         }
 
         [ODataPath(EdmConstants.EntityPath)]
@@ -119,17 +140,23 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var keyProperty = path.Segments[1] as KeyValuePathSegment;
             var keys = keyProperty.ParseKeyValue(entityType);
 
-            var executor = new DbCommandExecutor();
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var commandFactory = new DbCommandFactory(dbIdentifier);
 
+            var command = new Db.Couchbase.Commands.ReplaceCommand(keys, entity, entityType);
+            try
+            {
+                var result = await command.Execute(dbIdentifier);
 
-            var commands = await commandFactory.CreateUpdateCommand(keys, entity, entityType,
-                Request.ODataProperties().Model, false);
-
-            await executor.Execute(commands, Request);
-
-            return Updated(entity);
+                return Updated(result);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
         }
 
         [ODataPath(EdmConstants.EntityPath)]
@@ -146,16 +173,23 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var keyProperty = path.Segments[1] as KeyValuePathSegment;
             var keys = keyProperty.ParseKeyValue(entityType);
 
-            var executor = new DbCommandExecutor();
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var commandFactory = new DbCommandFactory(dbIdentifier);
 
+            try
+            {
+                var command = new Db.Couchbase.Commands.DeleteCommand(keys, entityType);
+                await command.Execute(dbIdentifier);
 
-            var commands = await commandFactory.CreateDeleteCommand(keys, entityType);
-
-            await executor.Execute(commands, Request);
-
-            return new StatusCodeResult(HttpStatusCode.NoContent, this);
+                return new StatusCodeResult(HttpStatusCode.NoContent, this);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
         }
 
         private ODataQueryOptions GetODataQueryOptions(IEdmType edmType, IEdmModel model, ODataPath path)
@@ -165,7 +199,7 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             return queryOptions;
         }
-        
+
         private IEdmEntityType EntityTypeFromPath()
         {
             var path = Request.ODataProperties().Path;
@@ -204,6 +238,23 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             return new CreatedODataResult<EdmEntityObject>(entity,
                 Request.GetRequestContext().Configuration.Services.GetContentNegotiator(), Request,
                 Request.GetRequestContext().Configuration.Formatters, new Uri(url));
+        }
+
+        private IHttpActionResult FromDbException(DbException exception)
+        {
+            switch (exception.Error)
+            {
+                case DbError.AuthenticationError:
+                    return new StatusCodeResult(HttpStatusCode.Unauthorized, this);
+                case DbError.InvalidData:
+                    return BadRequest();
+                case DbError.KeyExists:
+                    return Conflict();
+                case DbError.KeyNotFound:
+                    return NotFound();
+                default:
+                    return InternalServerError();
+            }
         }
     }
 }
