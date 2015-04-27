@@ -26,9 +26,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
 
         public async Task Execute(string tenantId)
         {
-            using (var provider = new BucketProvider())
+            using (var bucket = BucketProvider.GetBucket())
             {
-                var bucket = provider.GetBucket();
                 //Convert entity to document
                 var id = CreateId(tenantId);
 

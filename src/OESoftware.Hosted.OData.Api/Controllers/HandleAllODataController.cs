@@ -71,14 +71,14 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var model = Request.ODataProperties().Model;
             var keyGen = new Db.Couchbase.KeyGenerator();
             var tasks = (from key in entityType.DeclaredKey.Where(k => k.VocabularyAnnotations(model).Any(v => v.Term.FullName() == Microsoft.OData.Edm.Vocabularies.V1.CoreVocabularyConstants.Computed))
-                         let key1 = key select keyGen.CreateKey(dbIdentifier, key.Name, key.Type.Definition).ContinueWith((task) => { entity.TrySetPropertyValue(key1.Name, task.Result); })).ToList();
+                         let key1 = key
+                         select keyGen.CreateKey(dbIdentifier, key.Name, key.Type.Definition).ContinueWith((task) => { entity.TrySetPropertyValue(key1.Name, task.Result); })).ToList();
 
             await Task.WhenAll(tasks);
 
+            var command = new Db.Couchbase.Commands.InsertCommand(entity, entityType);
             try
             {
-                var command = await commandFactory.CreateInsertCommandNew(entity, entityType);
-
                 await command.Execute(dbIdentifier);
 
                 return Created(entity, entityType);
@@ -106,7 +106,7 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var path = Request.ODataProperties().Path;
             var keyProperty = path.Segments[1] as KeyValuePathSegment;
             var keys = keyProperty.ParseKeyValue(entityType);
-            
+
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
 
             var command = new Db.Couchbase.Commands.UpdateCommand(keys, entity, entityType);

@@ -98,9 +98,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                 throw new ApplicationException("Invalid DB identifier");
             }
 
-            using (var provider = new BucketProvider())
+            using (var bucket = BucketProvider.GetBucket())
             {
-                var bucket = provider.GetBucket();
                 var id = string.Format("{0}:{1}:Counter:{2}", tenantId, type.FullTypeName(), keyName);
                 var result = bucket.Increment(id);
                 if (!result.Success)

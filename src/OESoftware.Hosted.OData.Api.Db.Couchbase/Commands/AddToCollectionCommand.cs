@@ -13,8 +13,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
 {
     public class AddToCollectionCommand : IDbCommand
     {
-        private IEdmEntityType _entityType;
-        private string _key;
+        private readonly IEdmEntityType _entityType;
+        private readonly string _key;
 
         public AddToCollectionCommand(string key, IEdmEntityType entityType)
         {
@@ -24,9 +24,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
 
         public async Task Execute(string tenantId)
         {
-            using (var provider = new BucketProvider())
+            using (var bucket = BucketProvider.GetBucket())
             {
-                var bucket = provider.GetBucket();
                 var id = Helpers.CreateCollectionId(tenantId, _entityType);
                 var existing = bucket.GetDocument<JArray>(id);
                 if (!existing.Success)

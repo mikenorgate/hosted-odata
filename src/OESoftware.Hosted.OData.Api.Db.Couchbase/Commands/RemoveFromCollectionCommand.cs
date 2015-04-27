@@ -24,9 +24,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
 
         public async Task Execute(string tenantId)
         {
-            using (var provider = new BucketProvider())
+            using (var bucket = BucketProvider.GetBucket())
             {
-                var bucket = provider.GetBucket();
                 var id = Helpers.CreateCollectionId(tenantId, _entityType);
                 var existing = bucket.GetDocument<JArray>(id);
                 if (existing.Success)

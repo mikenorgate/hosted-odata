@@ -1,34 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Couchbase;
+﻿using Couchbase;
 using Couchbase.Core;
 
 namespace OESoftware.Hosted.OData.Api.Db.Couchbase
 {
-    public class BucketProvider : IDisposable
+    /// <summary>
+    /// Get a bucket from the Couchbase cluster
+    /// </summary>
+    public static class BucketProvider
     {
-
-        private Cluster _cluster;
-        private IBucket _bucket;
-
-        public IBucket GetBucket()
+        private static readonly Cluster Cluster = new Cluster("couchbaseClients/couchbase");
+        
+        /// <summary>
+        /// Get the default bucket
+        /// </summary>
+        /// <returns><see cref="IBucket"/></returns>
+        public static IBucket GetBucket()
         {
-            Dispose();
-
-            _cluster = new Cluster("couchbaseClients/couchbase");
-            _bucket = _cluster.OpenBucket();
-
-            return _bucket;
-        }
-
-        public void Dispose()
-        {
-            _bucket?.Dispose();
-
-            _cluster?.Dispose();
+            return Cluster.OpenBucket();
         }
     }
 }

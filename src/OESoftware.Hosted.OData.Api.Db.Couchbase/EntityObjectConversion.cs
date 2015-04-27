@@ -48,7 +48,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             {
                 if (!entityType.IsOpen)
                 {
-                    throw new ApplicationException("Dynamic properties not supported rt2on this type");
+                    throw new ApplicationException("Dynamic properties not supported on this type");
                 }
                 object value;
                 entity.TryGetPropertyValue(dynamicMemberName, out value);

@@ -46,6 +46,13 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data.HashFunction.Core">
+      <HintPath>..\..\packages\System.Data.HashFunction.Core.1.5.2.0\lib\net45\System.Data.HashFunction.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Data.HashFunction.xxHash">
+      <HintPath>..\..\packages\System.Data.HashFunction.xxHash.1.5.2.0\lib\net45\System.Data.HashFunction.xxHash.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System.Web.OData">
       <HintPath>..\..\..\..\Users\michael\Downloads\WebApi-master\WebApi-master\OData\bin\Debug\System.Web.OData.dll</HintPath>
     </Reference>

@@ -26,11 +26,10 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
 
         public async Task<EdmEntityObject> Execute(string tenantId)
         {
-            using (var provider = new BucketProvider())
+            using (var bucket = BucketProvider.GetBucket())
             {
-                var bucket = provider.GetBucket();
                 //Convert entity to document
-                var id = Helpers.CreateEntityId(tenantId, _keys, _entityType);
+                var id = await Helpers.CreateEntityId(tenantId, _keys, _entityType);
 
                 var result = bucket.Get<JObject>(id);
                 if (!result.Success)
