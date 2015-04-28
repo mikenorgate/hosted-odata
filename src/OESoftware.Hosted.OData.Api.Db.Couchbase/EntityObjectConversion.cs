@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
 using System.Text;
@@ -8,6 +9,7 @@ using System.Web.OData;
 using Microsoft.OData.Edm;
 using Newtonsoft.Json.Linq;
 using OESoftware.Hosted.OData.Api.Core;
+using System.Runtime.Caching;
 
 namespace OESoftware.Hosted.OData.Api.Db.Couchbase
 {
@@ -26,6 +28,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                                         r =>
                                             r.DependentProperty.Name.Equals(p.Name,
                                                 StringComparison.InvariantCultureIgnoreCase))))).ToList();
+
             foreach (var edmProperty in properties)
             {
                 var property = edmProperty;
@@ -44,6 +47,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                         e =>
                             !entityType.DeclaredProperties.Any(
                                 d => d.Name.Equals(e, StringComparison.InvariantCultureIgnoreCase))).ToList();
+
             foreach (var dynamicMemberName in dynamicProperties)
             {
                 if (!entityType.IsOpen)
@@ -54,54 +58,57 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                 entity.TryGetPropertyValue(dynamicMemberName, out value);
                 result.Add(dynamicMemberName, JToken.FromObject(value));
             }
-            
+
             return result;
         }
 
-        public async Task<EdmEntityObject> ToEdmEntityObject(JObject entity, IEdmEntityType entityType)
+        public async Task<EdmEntityObject> ToEdmEntityObject(JObject entity, string tenantId, IEdmEntityType entityType)
         {
-            var result = new EdmEntityObject(entityType);
-            var properties =
-                entityType.DeclaredProperties.Where(
-                    p =>
-                        (entityType.NavigationProperties() == null || !entityType.NavigationProperties()
-                            .Any(
-                                n =>
-                                    n.ReferentialConstraint.PropertyPairs.Any(
-                                        r =>
-                                            r.DependentProperty.Name.Equals(p.Name,
-                                                StringComparison.InvariantCultureIgnoreCase))))).ToList();
-            foreach (var edmProperty in properties)
+            return await Task<EdmEntityObject>.Factory.StartNew(() =>
             {
-                var property = edmProperty;
+                var result = new EdmEntityObject(entityType);
+                var properties =
+                    entityType.DeclaredProperties.Where(
+                        p =>
+                            (entityType.NavigationProperties() == null || !entityType.NavigationProperties()
+                                .Any(
+                                    n =>
+                                        n.ReferentialConstraint.PropertyPairs.Any(
+                                            r =>
+                                                r.DependentProperty.Name.Equals(p.Name,
+                                                    StringComparison.InvariantCultureIgnoreCase))))).ToList();
 
-                JToken value;
-                if (entity.TryGetValue(property.Name, out value))
+                foreach (var edmProperty in properties)
                 {
-                    result.TrySetPropertyValue(property.Name, value.ToObject(EdmTypeToClrType.Parse(property.Type.Definition)));
-                }
-            }
+                    var property = edmProperty;
 
-            var dynamicProperties =
-                entity.Properties()
-                    .Where(
-                        e =>
-                            !entityType.DeclaredProperties.Any(
-                                d => d.Name.Equals(e.Name, StringComparison.InvariantCultureIgnoreCase))).ToList();
-            foreach (var dynamicMemberName in dynamicProperties)
-            {
-                if (!entityType.IsOpen)
-                {
-                    throw new ApplicationException("Dynamic properties not supported on this type");
+                    JToken value;
+                    if (entity.TryGetValue(property.Name, out value))
+                    {
+                        result.TrySetPropertyValue(property.Name, value.ToObject(EdmTypeToClrType.Parse(property.Type.Definition)));
+                    }
                 }
-                JToken value;
-                if (entity.TryGetValue(dynamicMemberName.Name, out value))
+                var dynamicProperties =
+                    entity.Properties()
+                        .Where(
+                            e =>
+                                !entityType.DeclaredProperties.Any(
+                                    d => d.Name.Equals(e.Name, StringComparison.InvariantCultureIgnoreCase))).ToList();
+                foreach (var dynamicMemberName in dynamicProperties)
                 {
-                    result.TrySetPropertyValue(dynamicMemberName.Name, value.ToObject<string>());
+                    if (!entityType.IsOpen)
+                    {
+                        throw new ApplicationException("Dynamic properties not supported on this type");
+                    }
+                    JToken value;
+                    if (entity.TryGetValue(dynamicMemberName.Name, out value))
+                    {
+                        result.TrySetPropertyValue(dynamicMemberName.Name, value.ToObject<string>());
+                    }
                 }
-            }
 
-            return result;
+                return result;
+            }).ConfigureAwait(false);
         }
     }
 }

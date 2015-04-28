@@ -16,7 +16,7 @@ using Microsoft.OData.Edm.Library.Annotations;
 using Microsoft.OData.Edm.Validation;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using OESoftware.Hosted.OData.Api.DBHelpers;
+using OESoftware.Hosted.OData.Api.Db.Couchbase;
 using OESoftware.Hosted.OData.Api.Interfaces;
 
 namespace OESoftware.Hosted.OData.Api.Models
@@ -47,17 +47,22 @@ namespace OESoftware.Hosted.OData.Api.Models
                 return cached;
             }
 
-            var dbConnection = DBConnectionFactory.Open(dbIdentifier); //TODO: Get db name;
-            var collection = dbConnection.GetCollection<BsonDocument>("_schema");
-
-            var schema = (await (await collection.FindAsync(new BsonDocument())).ToListAsync()).FirstOrDefault();
-            if (schema == null) return new EdmModel();
-
-            using (var stringReader = new StringReader(schema.GetElement("value").Value.AsString))
+            using (var bucket = BucketProvider.GetBucket("Internal"))
             {
-                using (var xmlReader = XmlReader.Create(stringReader))
+                var schema = bucket.Get<string>(string.Format("Application:Schema:{0}", dbIdentifier));
+                if (!schema.Success)
                 {
-                    return EdmxReader.Parse(xmlReader);
+                    return new EdmModel();
+                }
+
+                using (var stringReader = new StringReader(schema.Value))
+                {
+                    using (var xmlReader = XmlReader.Create(stringReader))
+                    {
+                        var model = EdmxReader.Parse(xmlReader);
+                        ModelCache.Add(dbIdentifier, model, new CacheItemPolicy());
+                        return model;
+                    }
                 }
             }
         }
@@ -82,18 +87,25 @@ namespace OESoftware.Hosted.OData.Api.Models
                 return false;
             }
 
-            var dbConnection = DBConnectionFactory.Open(dbIdentifier);
-            var collection = dbConnection.GetCollection<BsonDocument>("_schema");
-
-            await collection.DeleteOneAsync(new BsonDocumentFilterDefinition<BsonDocument>(new BsonDocument()));
-
-            var doc = new BsonDocument();
-            doc.Add(new BsonElement("_id", new BsonInt32(1)));
-            doc.Add(new BsonElement("value", new BsonString(xmlBuilder.ToString())));
-            await collection.InsertOneAsync(doc);
-
-            ModelCache.Remove(dbIdentifier);
-
+            using (var bucket = BucketProvider.GetBucket("Internal"))
+            {
+                var id = string.Format("Application:Schema:{0}", dbIdentifier);
+                var schema = bucket.GetDocument<string>(id);
+                if (!schema.Success)
+                {
+                    bucket.Insert(id, xmlBuilder.ToString());
+                }
+                else
+                {
+                    schema.Document.Content = xmlBuilder.ToString();
+                    var replace = bucket.Replace(schema.Document);
+                    ModelCache.Remove(dbIdentifier);
+                    if (!replace.Success)
+                    {
+                        return false;
+                    }
+                }
+            }
             return true;
         }
 

@@ -1,15 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Threading.Tasks;
-using System.Web;
 using Microsoft.OData.Edm;
-using MongoDB.Bson;
-using MongoDB.Driver;
-using OESoftware.Hosted.OData.Api.Models;
 
-namespace OESoftware.Hosted.OData.Api.DBHelpers
+namespace OESoftware.Hosted.OData.Api
 {
     public class KeyParser
     {

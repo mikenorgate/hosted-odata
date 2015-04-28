@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.OData.Edm;
-using OESoftware.Hosted.OData.Api.DBHelpers;
+using OESoftware.Hosted.OData.Api.Db;
 using OESoftware.Hosted.OData.Api.Models;
 
 namespace OESoftware.Hosted.OData.Api.Tests

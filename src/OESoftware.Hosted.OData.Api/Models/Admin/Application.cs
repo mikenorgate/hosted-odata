@@ -11,22 +11,15 @@ namespace OESoftware.Hosted.OData.Api.Models.Admin
 {
     public class Application
     {
-        [BsonRequired]
-        [BsonId]
         public string ApplicationName { get; set; }
 
-        [BsonRequired]
         [EmailAddress]
         public string AdminEmailAddress { get; set; }
 
-        [BsonRequired]
-        public ObjectId PublicApiKey { get; set; }
+        public Guid PublicApiKey { get; set; }
 
-        [BsonRequired]
-        public ObjectId PrivateApiKey { get; set; }
+        public Guid PrivateApiKey { get; set; }
 
-        [BsonRequired]
-        [IgnoreDataMember]
-        public ObjectId DbIdentifier { get; set; }
+        public Guid DbIdentifier { get; set; }
     }
 }

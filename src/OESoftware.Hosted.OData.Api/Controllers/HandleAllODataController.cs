@@ -3,28 +3,21 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Reflection;
 using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.Http.Results;
 using System.Web.OData;
-using System.Web.OData.Builder;
 using System.Web.OData.Extensions;
 using System.Web.OData.Query;
 using System.Web.OData.Results;
 using System.Web.OData.Routing;
 using Microsoft.OData.Edm;
-using Microsoft.OData.Edm.Library;
-using Microsoft.OData.Edm.Validation;
-using MongoDB.Bson;
-using MongoDB.Driver;
-using MongoDB.Driver.Builders;
-using OESoftware.Hosted.OData.Api.DBHelpers;
-using OESoftware.Hosted.OData.Api.Extensions;
-using OESoftware.Hosted.OData.Api.Models;
+using Microsoft.OData.Edm.Vocabularies.V1;
 using OESoftware.Hosted.OData.Api.Attributes;
 using OESoftware.Hosted.OData.Api.Db;
-using OESoftware.Hosted.OData.Api.DBHelpers.Commands;
+using OESoftware.Hosted.OData.Api.Db.Couchbase;
+using OESoftware.Hosted.OData.Api.Db.Couchbase.Commands;
+using OESoftware.Hosted.OData.Api.Extensions;
 
 namespace OESoftware.Hosted.OData.Api.Controllers
 {
@@ -40,7 +33,29 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var keys = keyProperty.ParseKeyValue(entityType);
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new Db.Couchbase.Commands.GetCommand(keys, entityType);
+            var command = new GetCommand(keys, entityType);
+            try
+            {
+                var result = await command.Execute(dbIdentifier);
+                return Ok(result);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
+        }
+
+        [ODataPath(EdmConstants.EntitySetPath)]
+        public async Task<IHttpActionResult> GetCollection()
+        {
+            var entityType = EntityTypeFromPath();
+            
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+            var command = new GetAllCommand(entityType);
             try
             {
                 var result = await command.Execute(dbIdentifier);
@@ -65,18 +80,17 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             }
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var commandFactory = new DbCommandFactory(dbIdentifier);
 
             var entityType = EntityTypeFromPath();
             var model = Request.ODataProperties().Model;
-            var keyGen = new Db.Couchbase.KeyGenerator();
-            var tasks = (from key in entityType.DeclaredKey.Where(k => k.VocabularyAnnotations(model).Any(v => v.Term.FullName() == Microsoft.OData.Edm.Vocabularies.V1.CoreVocabularyConstants.Computed))
+            var keyGen = new KeyGenerator();
+            var tasks = (from key in entityType.DeclaredKey.Where(k => k.VocabularyAnnotations(model).Any(v => v.Term.FullName() == CoreVocabularyConstants.Computed))
                          let key1 = key
                          select keyGen.CreateKey(dbIdentifier, key.Name, key.Type.Definition).ContinueWith((task) => { entity.TrySetPropertyValue(key1.Name, task.Result); })).ToList();
 
             await Task.WhenAll(tasks);
 
-            var command = new Db.Couchbase.Commands.InsertCommand(entity, entityType);
+            var command = new InsertCommand(entity, entityType);
             try
             {
                 await command.Execute(dbIdentifier);
@@ -109,7 +123,7 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
 
-            var command = new Db.Couchbase.Commands.UpdateCommand(keys, entity, entityType);
+            var command = new UpdateCommand(keys, entity, entityType);
             try
             {
                 var result = await command.Execute(dbIdentifier);
@@ -142,7 +156,7 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
 
-            var command = new Db.Couchbase.Commands.ReplaceCommand(keys, entity, entityType);
+            var command = new ReplaceCommand(keys, entity, entityType);
             try
             {
                 var result = await command.Execute(dbIdentifier);
@@ -177,7 +191,7 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             try
             {
-                var command = new Db.Couchbase.Commands.DeleteCommand(keys, entityType);
+                var command = new DeleteCommand(keys, entityType);
                 await command.Execute(dbIdentifier);
 
                 return new StatusCodeResult(HttpStatusCode.NoContent, this);

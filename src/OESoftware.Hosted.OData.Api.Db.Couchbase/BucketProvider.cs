@@ -18,5 +18,15 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         {
             return Cluster.OpenBucket();
         }
+
+        /// <summary>
+        /// Get bucket by name
+        /// </summary>
+        /// <param name="name">Name of bucket</param>
+        /// <returns><see cref="IBucket"/></returns>
+        public static IBucket GetBucket(string name)
+        {
+            return Cluster.OpenBucket(name);
+        }
     }
 }

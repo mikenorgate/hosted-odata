@@ -49,7 +49,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                     throw ExceptionCreator.CreateDbException(find);
                 }
                 //Convert document back to entity
-                var output = await converter.ToEdmEntityObject(find.Value, _entityType);
+                var output = await converter.ToEdmEntityObject(find.Value, tenantId, _entityType);
 
                 return output;
             }

@@ -79,7 +79,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                 }
 
                 //Convert document back to entity
-                var output = await converter.ToEdmEntityObject(find.Content, _entityType);
+                var output = await converter.ToEdmEntityObject(find.Content, tenantId, _entityType);
 
                 return output;
             }

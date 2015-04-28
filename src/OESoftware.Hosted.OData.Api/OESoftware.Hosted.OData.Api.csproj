@@ -38,6 +38,24 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Common.Logging, Version=3.0.0.0, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\packages\Common.Logging.3.0.0\lib\net40\Common.Logging.dll</HintPath>
+    </Reference>
+    <Reference Include="Common.Logging.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\packages\Common.Logging.Core.3.0.0\lib\net40\Common.Logging.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Common.Logging.Log4Net1211">
+      <HintPath>..\..\packages\Common.Logging.Log4Net1211.3.0.0\lib\net40\Common.Logging.Log4Net1211.dll</HintPath>
+    </Reference>
+    <Reference Include="Couchbase.NetClient, Version=2.0.3.0, Culture=neutral, PublicKeyToken=05e9c6b5a9ec94c2, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\packages\CouchbaseNetClient.2.0.3.1\lib\net45\Couchbase.NetClient.dll</HintPath>
+    </Reference>
+    <Reference Include="log4net">
+      <HintPath>..\..\packages\log4net.2.0.0\lib\net40-full\log4net.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.OData.Core, Version=6.10.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -125,23 +143,13 @@
     <Compile Include="Controllers\AdminController.cs" />
     <Compile Include="Controllers\MetadataModifyController.cs" />
     <Compile Include="Controllers\HandleAllODataController.cs" />
-    <Compile Include="DBHelpers\Commands\DbFindCommand.cs" />
-    <Compile Include="DBHelpers\Commands\DbInsertCommand.cs" />
-    <Compile Include="DBHelpers\Commands\DbDeleteCommand.cs" />
-    <Compile Include="DBHelpers\Commands\DbUpdateCommand.cs" />
-    <Compile Include="DBHelpers\DbCommandExecutor.cs" />
-    <Compile Include="DBHelpers\DbCommandFactory.cs" />
-    <Compile Include="DBHelpers\DBConnectionFactory.cs" />
-    <Compile Include="DBHelpers\EdmModelDBUpdates.cs" />
-    <Compile Include="DBHelpers\IDbCommand.cs" />
-    <Compile Include="DBHelpers\IKeyGenerator.cs" />
-    <Compile Include="DBHelpers\KeyParser.cs" />
-    <Compile Include="DBHelpers\KeyGenerator.cs" />
     <Compile Include="EdmConstants.cs" />
-    <Compile Include="Extensions\EdmEntityObjectExtensions.cs" />
     <Compile Include="Extensions\KeyValuePathSegmentExtensions.cs" />
     <Compile Include="Interfaces\IModelProvider.cs" />
+    <Compile Include="KeyParser.cs" />
     <Compile Include="Middleware\ApiKeyValidation.cs" />
+    <Compile Include="Middleware\ExceptionLogging.cs" />
+    <Compile Include="Middleware\RequestLogging.cs" />
     <Compile Include="Models\Admin\Application.cs" />
     <Compile Include="Models\Admin\ApplicationRegistrationModel.cs" />
     <Compile Include="Models\IdCounter.cs" />

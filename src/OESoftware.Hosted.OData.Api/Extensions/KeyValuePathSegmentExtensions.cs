@@ -4,7 +4,6 @@ using System.Linq;
 using System.Web;
 using System.Web.OData.Routing;
 using Microsoft.OData.Edm;
-using OESoftware.Hosted.OData.Api.DBHelpers;
 
 namespace OESoftware.Hosted.OData.Api.Extensions
 {

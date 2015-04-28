@@ -14,7 +14,6 @@ using Microsoft.OData.Edm;
 using Microsoft.OData.Edm.Library;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using OESoftware.Hosted.OData.Api.DBHelpers;
 using OESoftware.Hosted.OData.Api.Extensions;
 using OESoftware.Hosted.OData.Api.Interfaces;
 
@@ -65,7 +64,7 @@ namespace OESoftware.Hosted.OData.Api.Routing
             {
                 return false;
             }
-
+            
             var oDataPathString = oDataPathValue as string;
 
             ODataPath path;
