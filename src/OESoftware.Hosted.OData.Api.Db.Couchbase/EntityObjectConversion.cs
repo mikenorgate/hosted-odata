@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Contracts;
 using System.Dynamic;
 using System.Linq;
 using System.Text;
@@ -10,14 +11,16 @@ using Microsoft.OData.Edm;
 using Newtonsoft.Json.Linq;
 using OESoftware.Hosted.OData.Api.Core;
 using System.Runtime.Caching;
+using Microsoft.OData.Edm.Vocabularies.V1;
 
 namespace OESoftware.Hosted.OData.Api.Db.Couchbase
 {
     public class EntityObjectConverter
     {
-        public async Task<JObject> ToDocument(EdmEntityObject entity, string tenantId, IEdmEntityType entityType)
+        public async Task<JObject> ToDocument(EdmEntityObject entity, string tenantId, IEdmEntityType entityType, bool generateKeys, IEdmModel model)
         {
-            var result = new JObject();
+            Contract.Requires(model != null);
+
             var properties =
                 entityType.DeclaredProperties.Where(
                     p =>
@@ -29,16 +32,101 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                                             r.DependentProperty.Name.Equals(p.Name,
                                                 StringComparison.InvariantCultureIgnoreCase))))).ToList();
 
-            foreach (var edmProperty in properties)
+            return await ToDocumentInternal(entity, tenantId, entityType, properties, generateKeys, model);
+
+
+        }
+
+        public async Task<JObject> ToDocument(EdmComplexObject entity, string tenantId, IEdmComplexType entityType, bool generateKeys, IEdmModel model)
+        {
+            Contract.Requires(model != null);
+
+            var properties =
+                entityType.DeclaredProperties.ToList();
+
+            return await ToDocumentInternal(entity, tenantId, entityType, properties, generateKeys, model);
+        }
+
+        public async Task<EdmEntityObject> ToEdmEntityObject(JObject entity, string tenantId, IEdmEntityType entityType)
+        {
+            return await Task<EdmEntityObject>.Factory.StartNew(() =>
+            {
+                var result = new EdmEntityObject(entityType);
+                var properties =
+                    entityType.DeclaredProperties.Where(
+                        p =>
+                            (entityType.NavigationProperties() == null || !entityType.NavigationProperties()
+                                .Any(
+                                    n =>
+                                        n.ReferentialConstraint.PropertyPairs.Any(
+                                            r =>
+                                                r.DependentProperty.Name.Equals(p.Name,
+                                                    StringComparison.InvariantCultureIgnoreCase))))).ToList();
+
+                ToEdmEntityObjectInternal(entity, tenantId, entityType, properties, result);
+
+                return result;
+            }).ConfigureAwait(false);
+        }
+
+        public async Task<EdmComplexObject> ToEdmEntityObject(JObject entity, string tenantId, IEdmComplexType entityType)
+        {
+            return await Task<EdmComplexObject>.Factory.StartNew(() =>
+            {
+                var result = new EdmComplexObject(entityType);
+                var properties =
+                    entityType.DeclaredProperties.ToList();
+
+                ToEdmEntityObjectInternal(entity, tenantId, entityType, properties, result);
+
+                return result;
+            }).ConfigureAwait(false);
+        }
+
+        private async Task<JObject> ToDocumentInternal(EdmStructuredObject entity, string tenantId, IEdmStructuredType entityType, IList<IEdmProperty> properties, bool generateKeys, IEdmModel model)
+        {
+            Contract.Requires(model != null);
+
+            var keyGen = new KeyGenerator();
+            var result = new JObject();
+            foreach (var edmProperty in properties.Where(
+                            k =>
+                                k.VocabularyAnnotations(model).All(v => v.Term.FullName() != CoreVocabularyConstants.Computed)))
             {
                 var property = edmProperty;
 
-                if (entity.GetChangedPropertyNames().Contains(property.Name))
+                object value;
+                entity.TryGetPropertyValue(property.Name, out value);
+                var complex = value as EdmComplexObject;
+                if (complex != null)
                 {
-                    object value;
-                    entity.TryGetPropertyValue(property.Name, out value);
-                    result.Add(property.Name, JToken.FromObject(value));
+                    var obj = await ToDocument(complex, tenantId, complex.GetEdmType().Definition as IEdmComplexType, generateKeys, model);
+                    result.Add(property.Name, obj);
                 }
+                else
+                {
+                    result.Add(property.Name, value == null ? null : JToken.FromObject(value));
+                }
+            }
+
+            if (generateKeys)
+            {
+                var tasks =
+                    (from key in
+                        entityType.DeclaredProperties.Where(
+                            k =>
+                                k.VocabularyAnnotations(model)
+                                    .Any(v => v.Term.FullName() == CoreVocabularyConstants.Computed))
+                        let key1 = key
+                        select
+                            keyGen.CreateKey(tenantId, key.Name, key.Type.Definition, entityType)
+                                .ContinueWith((task) =>
+                                {
+                                    entity.TrySetPropertyValue(key1.Name, task.Result);
+                                    result[key1.Name] = JToken.FromObject(task.Result);
+                                })).ToList
+                        ();
+                await Task.WhenAll(tasks);
             }
 
             var dynamicProperties =
@@ -58,57 +146,49 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                 entity.TryGetPropertyValue(dynamicMemberName, out value);
                 result.Add(dynamicMemberName, JToken.FromObject(value));
             }
-
+            
             return result;
         }
 
-        public async Task<EdmEntityObject> ToEdmEntityObject(JObject entity, string tenantId, IEdmEntityType entityType)
+        private void ToEdmEntityObjectInternal<T, I>(JObject entity, string tenantId, I entityType, IList<IEdmProperty> properties, T result) where T : EdmStructuredObject where I : IEdmStructuredType
         {
-            return await Task<EdmEntityObject>.Factory.StartNew(() =>
+            foreach (var edmProperty in properties)
             {
-                var result = new EdmEntityObject(entityType);
-                var properties =
-                    entityType.DeclaredProperties.Where(
-                        p =>
-                            (entityType.NavigationProperties() == null || !entityType.NavigationProperties()
-                                .Any(
-                                    n =>
-                                        n.ReferentialConstraint.PropertyPairs.Any(
-                                            r =>
-                                                r.DependentProperty.Name.Equals(p.Name,
-                                                    StringComparison.InvariantCultureIgnoreCase))))).ToList();
+                var property = edmProperty;
 
-                foreach (var edmProperty in properties)
+                JToken value;
+                if (entity.TryGetValue(property.Name, out value))
                 {
-                    var property = edmProperty;
-
-                    JToken value;
-                    if (entity.TryGetValue(property.Name, out value))
+                    if (property.Type.Definition is IEdmComplexType)
                     {
-                        result.TrySetPropertyValue(property.Name, value.ToObject(EdmTypeToClrType.Parse(property.Type.Definition)));
+                        var obj = ToEdmEntityObject(value as JObject, tenantId, property.Type.Definition as IEdmComplexType).Result;
+                        result.TrySetPropertyValue(property.Name, obj);
+                    }
+                    else
+                    {
+                        result.TrySetPropertyValue(property.Name,
+                            value.ToObject(EdmTypeToClrType.Parse(property.Type.Definition)));
                     }
                 }
-                var dynamicProperties =
-                    entity.Properties()
-                        .Where(
-                            e =>
-                                !entityType.DeclaredProperties.Any(
-                                    d => d.Name.Equals(e.Name, StringComparison.InvariantCultureIgnoreCase))).ToList();
-                foreach (var dynamicMemberName in dynamicProperties)
+            }
+            var dynamicProperties =
+                entity.Properties()
+                    .Where(
+                        e =>
+                            !entityType.DeclaredProperties.Any(
+                                d => d.Name.Equals(e.Name, StringComparison.InvariantCultureIgnoreCase))).ToList();
+            foreach (var dynamicMemberName in dynamicProperties)
+            {
+                if (!entityType.IsOpen)
                 {
-                    if (!entityType.IsOpen)
-                    {
-                        throw new ApplicationException("Dynamic properties not supported on this type");
-                    }
-                    JToken value;
-                    if (entity.TryGetValue(dynamicMemberName.Name, out value))
-                    {
-                        result.TrySetPropertyValue(dynamicMemberName.Name, value.ToObject<string>());
-                    }
+                    throw new ApplicationException("Dynamic properties not supported on this type");
                 }
-
-                return result;
-            }).ConfigureAwait(false);
+                JToken value;
+                if (entity.TryGetValue(dynamicMemberName.Name, out value))
+                {
+                    result.TrySetPropertyValue(dynamicMemberName.Name, value.ToObject<string>());
+                }
+            }
         }
     }
 }

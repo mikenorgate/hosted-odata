@@ -12,6 +12,7 @@ using System.Web.OData.Query;
 using System.Web.OData.Results;
 using System.Web.OData.Routing;
 using Microsoft.OData.Edm;
+using Microsoft.OData.Edm.Library;
 using Microsoft.OData.Edm.Vocabularies.V1;
 using OESoftware.Hosted.OData.Api.Attributes;
 using OESoftware.Hosted.OData.Api.Db;
@@ -49,11 +50,54 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             }
         }
 
+        [ODataPath(EdmConstants.EntityRawPropertyPath)]
+        public async Task<IHttpActionResult> GetItemRawProperty()
+        {
+            return await GetItemProperty();
+        }
+
+        [ODataPath(EdmConstants.EntityPropertyPath)]
+        public async Task<IHttpActionResult> GetItemProperty()
+        {
+            var entityType = EntityTypeFromPath();
+
+            var path = Request.ODataProperties().Path;
+            var keyProperty = path.Segments[1] as KeyValuePathSegment;
+            var keys = keyProperty.ParseKeyValue(entityType);
+
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+            var command = new GetCommand(keys, entityType);
+            try
+            {
+                var result = await command.Execute(dbIdentifier);
+                var propertySegements = path.Segments.Where(s => s is PropertyAccessPathSegment).Cast<PropertyAccessPathSegment>().ToList();
+                IEdmStructuredObject propertyValue = result;
+                dynamic value = null;
+                foreach (var propertySegement in propertySegements)
+                {
+                    if (propertyValue.TryGetPropertyValue(propertySegement.PropertyName, out value) && value is IEdmStructuredObject)
+                    {
+                        propertyValue = (IEdmStructuredObject)value;
+                    }
+                }
+
+                return Ok(value);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
+        }
+
         [ODataPath(EdmConstants.EntitySetPath)]
         public async Task<IHttpActionResult> GetCollection()
         {
             var entityType = EntityTypeFromPath();
-            
+
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
             var command = new GetAllCommand(entityType);
             try
@@ -83,14 +127,8 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             var entityType = EntityTypeFromPath();
             var model = Request.ODataProperties().Model;
-            var keyGen = new KeyGenerator();
-            var tasks = (from key in entityType.DeclaredKey.Where(k => k.VocabularyAnnotations(model).Any(v => v.Term.FullName() == CoreVocabularyConstants.Computed))
-                         let key1 = key
-                         select keyGen.CreateKey(dbIdentifier, key.Name, key.Type.Definition).ContinueWith((task) => { entity.TrySetPropertyValue(key1.Name, task.Result); })).ToList();
 
-            await Task.WhenAll(tasks);
-
-            var command = new InsertCommand(entity, entityType);
+            var command = new InsertCommand(entity, entityType, model);
             try
             {
                 await command.Execute(dbIdentifier);
@@ -123,7 +161,8 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
 
-            var command = new UpdateCommand(keys, entity, entityType);
+            var model = Request.ODataProperties().Model;
+            var command = new UpdateCommand(keys, entity, entityType, model);
             try
             {
                 var result = await command.Execute(dbIdentifier);
@@ -156,7 +195,8 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
 
-            var command = new ReplaceCommand(keys, entity, entityType);
+            var model = Request.ODataProperties().Model;
+            var command = new ReplaceCommand(keys, entity, entityType, model);
             try
             {
                 var result = await command.Execute(dbIdentifier);
@@ -217,15 +257,17 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         private IEdmEntityType EntityTypeFromPath()
         {
             var path = Request.ODataProperties().Path;
+            var segment = path.Segments.FirstOrDefault(s => s is EntitySetPathSegment) as EntitySetPathSegment;
             IEdmEntityType entityType = null;
-            if (path.EdmType is IEdmCollectionType)
+            var type = segment.GetEdmType(null);
+            if (type is IEdmCollectionType)
             {
-                var collectionType = (IEdmCollectionType)path.EdmType;
+                var collectionType = (IEdmCollectionType)type;
                 entityType = (IEdmEntityType)collectionType.ElementType.Definition;
             }
             else
             {
-                entityType = (IEdmEntityType)path.EdmType;
+                entityType = (IEdmEntityType)type;
             }
             return entityType;
         }

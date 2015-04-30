@@ -8,7 +8,7 @@ namespace OESoftware.Hosted.OData.Api.Tests
 {
     public class TestKeyGenerator : IKeyGenerator
     {
-        public async Task<object> CreateKey(string dbIdentifier, string keyName, IEdmType type)
+        public async Task<object> CreateKey(string dbIdentifier, string keyName, IEdmType type, IEdmType entityType)
         {
             return await Task<object>.Run(async () =>
             {

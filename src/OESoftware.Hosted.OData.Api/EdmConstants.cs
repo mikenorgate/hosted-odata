@@ -137,6 +137,10 @@ namespace OESoftware.Hosted.OData.Api
 
         internal const string EntityPath = "~/entityset/key";
 
+        internal const string EntityPropertyPath = "~/entityset/key/(property(/?))+";
+
+        internal const string EntityRawPropertyPath = "~/entityset/key/(property(/?))+/\\$value";
+
         #endregion
     }
 }

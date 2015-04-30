@@ -17,11 +17,13 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
     {
         private IEdmEntityType _entityType;
         private EdmEntityObject _entity;
+        private IEdmModel _model;
 
-        public InsertCommand(EdmEntityObject entity, IEdmEntityType entityType)
+        public InsertCommand(EdmEntityObject entity, IEdmEntityType entityType, IEdmModel model)
         {
             _entity = entity;
             _entityType = entityType;
+            _model = model;
         }
 
         public async Task<EdmEntityObject> Execute(string tenantId)
@@ -29,10 +31,11 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
             using (var bucket = BucketProvider.GetBucket())
             {
                 //Convert entity to document
-                var id = await Helpers.CreateEntityId(tenantId, _entity, _entityType);
                 var converter = new EntityObjectConverter();
 
-                var document = await converter.ToDocument(_entity, tenantId, _entityType);
+                var document = await converter.ToDocument(_entity, tenantId, _entityType, true, _model);
+
+                var id = await Helpers.CreateEntityId(tenantId, _entity, _entityType);
 
                 var result = bucket.Insert(id, document);
                 if (!result.Success)

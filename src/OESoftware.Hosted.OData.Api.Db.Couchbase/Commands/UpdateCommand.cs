@@ -19,12 +19,14 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
         private IEdmEntityType _entityType;
         private EdmEntityObject _entity;
         private IDictionary<string, object> _keys;
+        private IEdmModel _model;
 
-        public UpdateCommand(IDictionary<string, object> keys, EdmEntityObject entity, IEdmEntityType entityType)
+        public UpdateCommand(IDictionary<string, object> keys, EdmEntityObject entity, IEdmEntityType entityType, IEdmModel model)
         {
             _entity = entity;
             _entityType = entityType;
             _keys = keys;
+            _model = model;
         }
 
         public async Task<EdmEntityObject> Execute(string tenantId)
@@ -44,12 +46,14 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                     throw ExceptionCreator.CreateDbException(find);
                 }
 
-                var document = await converter.ToDocument(_entity, tenantId, _entityType);
-                //Replace the existing values with the new ones
-                foreach (var property in document.Properties())
+                var document = await converter.ToDocument(_entity, tenantId, _entityType, false, _model);
+                var mergeSettings = new JsonMergeSettings
                 {
-                    find.Content[property.Name] = property.Value;
-                }
+                    MergeArrayHandling = MergeArrayHandling.Union,
+                };
+
+                //Replace the existing values with the new ones
+                find.Content.Merge(document, mergeSettings);
                 
                 //If the key hasn't changed then replace
                 if (originalId.Equals(id, StringComparison.InvariantCultureIgnoreCase))

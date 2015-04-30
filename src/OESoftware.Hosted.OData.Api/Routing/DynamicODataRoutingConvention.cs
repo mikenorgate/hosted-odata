@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Caching;
+using System.Text.RegularExpressions;
 using System.Web.Http.Controllers;
 using System.Web.OData.Routing;
 using System.Web.OData.Routing.Conventions;
@@ -36,12 +37,12 @@ namespace OESoftware.Hosted.OData.Api.Routing
                 .FirstOrDefault(
                     m =>
                         m.GetCustomAttributes(typeof(ODataPathAttribute), false).Length > 0 &&
-                        m.GetCustomAttribute<ODataPathAttribute>(false).PathTemplate.Equals(odataPath.PathTemplate, StringComparison.InvariantCultureIgnoreCase) &&
+                        Regex.IsMatch(odataPath.PathTemplate, string.Format("^{0}$",m.GetCustomAttribute<ODataPathAttribute>(false).PathTemplate)) &&
                         m.Name.StartsWith(controllerContext.Request.Method.ToString(), StringComparison.InvariantCultureIgnoreCase));
 
             if (method != null)
             {
-                ActionCache.Add(odataPath.PathTemplate, method.Name, new CacheItemPolicy());
+                ActionCache.Add(string.Format("{0}:{1}",controllerContext.Request.Method, odataPath.PathTemplate), method.Name, new CacheItemPolicy());
             }
 
             return method?.Name;

@@ -33,7 +33,7 @@
         <Property Name="NonComputed" Type="Edm.Guid" Nullable="false">
         </Property>
       </EntityType>
-      
+
       <EntityType Name="EntityMixedProperties">
         <Property Name="ItemId" Type="Edm.Int32" Nullable="false">
           <Annotation Term="Core.Computed" Bool="true" />
@@ -44,11 +44,11 @@
         <Property Name="NonComputed" Type="Edm.Guid" Nullable="false">
         </Property>
       </EntityType>
-      
+
       <EntityType Name="OpenEntity" OpenType="true">
       </EntityType>
 
-      
+
       <EntityType Name="EntityWithOneKey">
         <Key>
           <PropertyRef Name="ItemId"/>
@@ -61,6 +61,33 @@
         <Property Name="NonComputed" Type="Edm.Guid" Nullable="false">
         </Property>
       </EntityType>
+
+      <EntityType Name="EntityWithComplexTypes">
+        <Key>
+          <PropertyRef Name="ItemId"/>
+        </Key>
+        <Property Name="ItemId" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Press" Type="NorthwindModel.Press" Nullable="false">
+        </Property>
+        <!--<Property Name="Category" Type="NorthwindModel.Category" Nullable="false">
+        </Property>-->
+      </EntityType>
+
+      <ComplexType Name="Press" OpenType="true">
+        <Property Name="Name" Type="Edm.String" />
+        <Property Name="Web" Type="Edm.String" />
+        <Property Name="PressId" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+      </ComplexType>
+
+      <EnumType Name="Category">
+        <Member Name="Book" Value="0" />
+        <Member Name="Magazine" Value="1" />
+        <Member Name="EBook" Value="2" />
+      </EnumType>
     </Schema>
     <Schema Namespace="ODataWebExperimental.Northwind.Model" xmlns="http://docs.oasis-open.org/odata/ns/edm">
       <EntityContainer xmlns:p4="http://schemas.microsoft.com/ado/2009/02/edm/annotation" Name="NorthwindEntities" p4:LazyLoadingEnabled="true">
@@ -68,6 +95,7 @@
         <EntitySet Name="EntityWithMixedKeys" EntityType="NorthwindModel.EntityWithMixedKeys" />
         <EntitySet Name="EntityMixedProperties" EntityType="NorthwindModel.EntityMixedProperties" />
         <EntitySet Name="EntityWithOneKey" EntityType="NorthwindModel.EntityWithOneKey" />
+        <EntitySet Name="EntityWithComplexTypes" EntityType="NorthwindModel.EntityWithComplexTypes" />
       </EntityContainer>
     </Schema>
   </edmx:DataServices>
