@@ -88,6 +88,11 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             return string.Format("{0}:c:{1}", tenantId, entityType.FullTypeName());
         }
 
+        public static string CreateSingletonId(string tenantId, IEdmSingleton singleton)
+        {
+            return string.Format("{0}:{1}", tenantId, singleton.EntityType().FullTypeName());
+        }
+
         /// <summary>
         /// Create a hash from a list of values
         /// </summary>

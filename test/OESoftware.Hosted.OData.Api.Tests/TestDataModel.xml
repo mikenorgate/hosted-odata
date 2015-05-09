@@ -88,6 +88,19 @@
         <Member Name="Magazine" Value="1" />
         <Member Name="EBook" Value="2" />
       </EnumType>
+
+      <EntityType Name="Singleton">
+        <Key>
+          <PropertyRef Name="ItemId"/>
+        </Key>
+        <Property Name="ItemId" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="ItemGuid" Type="Edm.Guid" Nullable="false">
+        </Property>
+        <Property Name="NonComputed" Type="Edm.Guid" Nullable="false">
+        </Property>
+      </EntityType>
     </Schema>
     <Schema Namespace="ODataWebExperimental.Northwind.Model" xmlns="http://docs.oasis-open.org/odata/ns/edm">
       <EntityContainer xmlns:p4="http://schemas.microsoft.com/ado/2009/02/edm/annotation" Name="NorthwindEntities" p4:LazyLoadingEnabled="true">
@@ -96,6 +109,7 @@
         <EntitySet Name="EntityMixedProperties" EntityType="NorthwindModel.EntityMixedProperties" />
         <EntitySet Name="EntityWithOneKey" EntityType="NorthwindModel.EntityWithOneKey" />
         <EntitySet Name="EntityWithComplexTypes" EntityType="NorthwindModel.EntityWithComplexTypes" />
+        <Singleton Name="Singleton" Type="NorthwindModel.Singleton" />
       </EntityContainer>
     </Schema>
   </edmx:DataServices>

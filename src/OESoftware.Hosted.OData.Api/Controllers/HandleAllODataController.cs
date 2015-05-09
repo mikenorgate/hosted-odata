@@ -11,9 +11,11 @@ using System.Web.OData.Extensions;
 using System.Web.OData.Query;
 using System.Web.OData.Results;
 using System.Web.OData.Routing;
+using Microsoft.OData.Core;
 using Microsoft.OData.Edm;
 using Microsoft.OData.Edm.Library;
 using Microsoft.OData.Edm.Vocabularies.V1;
+using Newtonsoft.Json.Linq;
 using OESoftware.Hosted.OData.Api.Attributes;
 using OESoftware.Hosted.OData.Api.Db;
 using OESoftware.Hosted.OData.Api.Db.Couchbase;
@@ -50,13 +52,30 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             }
         }
 
-        [ODataPath(EdmConstants.EntityRawPropertyPath)]
-        public async Task<IHttpActionResult> GetItemRawProperty()
+        [ODataPath(EdmConstants.SingletonPath)]
+        public async Task<IHttpActionResult> GetSingleton()
         {
-            return await GetItemProperty();
+            var entityType = SingletonFromPath();
+
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+            var command = new GetSingletonCommand(entityType);
+            try
+            {
+                var result = await command.Execute(dbIdentifier);
+                return Ok(result);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
         }
 
         [ODataPath(EdmConstants.EntityPropertyPath)]
+        [ODataPath(EdmConstants.EntityRawPropertyPath)]
         public async Task<IHttpActionResult> GetItemProperty()
         {
             var entityType = EntityTypeFromPath();
@@ -70,16 +89,34 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             try
             {
                 var result = await command.Execute(dbIdentifier);
-                var propertySegements = path.Segments.Where(s => s is PropertyAccessPathSegment).Cast<PropertyAccessPathSegment>().ToList();
-                IEdmStructuredObject propertyValue = result;
-                dynamic value = null;
-                foreach (var propertySegement in propertySegements)
-                {
-                    if (propertyValue.TryGetPropertyValue(propertySegement.PropertyName, out value) && value is IEdmStructuredObject)
-                    {
-                        propertyValue = (IEdmStructuredObject)value;
-                    }
-                }
+                var value = PropertyFromEntity(path, result);
+
+                return Ok(value);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
+        }
+
+        [ODataPath(EdmConstants.SingletonPropertyPath)]
+        [ODataPath(EdmConstants.SingletonRawPropertyPath)]
+        public async Task<IHttpActionResult> GetSingletonProperty()
+        {
+            var entityType = SingletonFromPath();
+
+            var path = Request.ODataProperties().Path;
+
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+            var command = new GetSingletonCommand(entityType);
+            try
+            {
+                var result = await command.Execute(dbIdentifier);
+                var value = PropertyFromEntity(path, result);
 
                 return Ok(value);
             }
@@ -179,6 +216,36 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             }
         }
 
+        [ODataPath(EdmConstants.SingletonPath)]
+        public async Task<IHttpActionResult> PatchSingleton(EdmEntityObject entity)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var entityType = SingletonFromPath();
+
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+
+            var model = Request.ODataProperties().Model;
+            var command = new UpdateSingletonCommand(entity, entityType, model);
+            try
+            {
+                var result = await command.Execute(dbIdentifier);
+
+                return Ok(result);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
+        }
+
         [ODataPath(EdmConstants.EntityPath)]
         public async Task<IHttpActionResult> PutItem(EdmEntityObject entity)
         {
@@ -212,6 +279,79 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 return BadRequest();
             }
         }
+
+        [ODataPath(EdmConstants.SingletonPath)]
+        public async Task<IHttpActionResult> PutSingleton(EdmEntityObject entity)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var entityType = SingletonFromPath();
+
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+
+            var model = Request.ODataProperties().Model;
+            var command = new ReplaceSingletonCommand(entity, entityType, model);
+            try
+            {
+                var result = await command.Execute(dbIdentifier);
+
+                return Ok(result);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
+        }
+
+        [ODataPath(EdmConstants.EntityPropertyPath)]
+        [ODataPath(EdmConstants.EntityRawPropertyPath)]
+        public async Task<IHttpActionResult> PutItemProperty([FromBody]string value)
+        {
+            var entityType = EntityTypeFromPath();
+
+            var path = Request.ODataProperties().Path;
+
+            var updateEntity = new EdmEntityObject(entityType);
+
+            EdmStructuredObject propertyEntity = updateEntity;
+            IEdmStructuredType propertyType = entityType;
+            foreach (var oDataPathSegment in path.Segments.Where(s=>s is PropertyAccessPathSegment))
+            {
+                var pathSegment = (PropertyAccessPathSegment) oDataPathSegment;
+                if (
+                    propertyType != null && propertyType.DeclaredProperties.Any(
+                        p => p.Name.Equals(pathSegment.PropertyName, StringComparison.InvariantCultureIgnoreCase)))
+                {
+                    if (pathSegment.Property.Type.IsPrimitive())
+                    {
+                        propertyEntity.TrySetPropertyValue(pathSegment.PropertyName, value);
+                    }
+                    else
+                    {
+                        propertyType = pathSegment.Property.Type.Definition as IEdmComplexType;
+                        var complex = new EdmComplexObject((IEdmComplexType)propertyType);
+                        propertyEntity.TrySetPropertyValue(pathSegment.PropertyName, complex);
+                        propertyEntity = complex;
+                    }
+                }
+                else
+                {
+                    return NotFound();
+                }
+            }
+
+            await PatchItem(updateEntity);
+
+            return Ok(value);
+        }
+        
 
         [ODataPath(EdmConstants.EntityPath)]
         public async Task<IHttpActionResult> DeleteItem()
@@ -259,17 +399,27 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var path = Request.ODataProperties().Path;
             var segment = path.Segments.FirstOrDefault(s => s is EntitySetPathSegment) as EntitySetPathSegment;
             IEdmEntityType entityType = null;
-            var type = segment.GetEdmType(null);
-            if (type is IEdmCollectionType)
+            if (segment != null)
             {
-                var collectionType = (IEdmCollectionType)type;
-                entityType = (IEdmEntityType)collectionType.ElementType.Definition;
-            }
-            else
-            {
-                entityType = (IEdmEntityType)type;
+                var type = segment.GetEdmType(null);
+                if (type is IEdmCollectionType)
+                {
+                    var collectionType = (IEdmCollectionType) type;
+                    entityType = (IEdmEntityType) collectionType.ElementType.Definition;
+                }
+                else
+                {
+                    entityType = (IEdmEntityType) type;
+                }
             }
             return entityType;
+        }
+
+        private IEdmSingleton SingletonFromPath()
+        {
+            var path = Request.ODataProperties().Path;
+            var segment = path.Segments.FirstOrDefault(s => s is SingletonPathSegment) as SingletonPathSegment;
+            return segment.Singleton;
         }
 
         protected CreatedODataResult<EdmEntityObject> Created(EdmEntityObject entity, IEdmEntityType entityType)
@@ -311,6 +461,22 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 default:
                     return InternalServerError();
             }
+        }
+
+        private static dynamic PropertyFromEntity(ODataPath path, EdmEntityObject result)
+        {
+            var propertySegements =
+                path.Segments.Where(s => s is PropertyAccessPathSegment).Cast<PropertyAccessPathSegment>().ToList();
+            IEdmStructuredObject propertyValue = result;
+            dynamic value = null;
+            foreach (var propertySegement in propertySegements)
+            {
+                if (propertyValue.TryGetPropertyValue(propertySegement.PropertyName, out value) && value is IEdmStructuredObject)
+                {
+                    propertyValue = (IEdmStructuredObject)value;
+                }
+            }
+            return value;
         }
     }
 }

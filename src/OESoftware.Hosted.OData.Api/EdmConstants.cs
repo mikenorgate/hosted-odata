@@ -141,6 +141,12 @@ namespace OESoftware.Hosted.OData.Api
 
         internal const string EntityRawPropertyPath = "~/entityset/key/(property(/?))+/\\$value";
 
+        internal const string SingletonPath = "~/singleton";
+
+        internal const string SingletonPropertyPath = "~/singleton/(property(/?))+";
+
+        internal const string SingletonRawPropertyPath = "~/singleton/(property(/?))+/\\$value";
+
         #endregion
     }
 }

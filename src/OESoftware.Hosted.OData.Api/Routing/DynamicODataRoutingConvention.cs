@@ -32,12 +32,12 @@ namespace OESoftware.Hosted.OData.Api.Routing
             {
                 return ActionCache.Get(odataPath.PathTemplate).ToString();
             }
-
+            
             var method = controllerContext.Controller.GetType().GetMethods()
                 .FirstOrDefault(
                     m =>
                         m.GetCustomAttributes(typeof(ODataPathAttribute), false).Length > 0 &&
-                        Regex.IsMatch(odataPath.PathTemplate, string.Format("^{0}$",m.GetCustomAttribute<ODataPathAttribute>(false).PathTemplate)) &&
+                        m.GetCustomAttributes(typeof(ODataPathAttribute), false).Cast<ODataPathAttribute>().Any( a=> Regex.IsMatch(odataPath.PathTemplate, string.Format("^{0}$",a.PathTemplate))) &&
                         m.Name.StartsWith(controllerContext.Request.Method.ToString(), StringComparison.InvariantCultureIgnoreCase));
 
             if (method != null)
@@ -50,7 +50,7 @@ namespace OESoftware.Hosted.OData.Api.Routing
 
         public string SelectController(ODataPath odataPath, HttpRequestMessage request)
         {
-            return (odataPath.Segments.FirstOrDefault() is EntitySetPathSegment) ? _controllerName : null;
+            return (odataPath.Segments.FirstOrDefault() is ODataPathSegment) ? _controllerName : null;
         }
     }
 }

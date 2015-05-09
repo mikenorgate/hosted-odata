@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace OESoftware.Hosted.OData.Api.Attributes
 {
-    [AttributeUsage(AttributeTargets.Method)]
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
     public class ODataPathAttribute : Attribute
     {
         public string PathTemplate { get; private set; }
