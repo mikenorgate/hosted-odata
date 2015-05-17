@@ -34,12 +34,13 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                 //Convert entity to document
                 var id = Helpers.CreateSingletonId(tenantId, _singleton);
 
-                var converter = new EntityObjectConverter();
+                var converter = new EntityObjectConverter(new KeyGenerator());
 
                 //Get the current version
                 var find = bucket.GetDocument<JObject>(id);
 
-                var document = await converter.ToDocument(_entity, tenantId, _singleton.EntityType(), false, _model);
+                //TODO: Convert options
+                var document = await converter.ToDocument(_entity, tenantId, _singleton.EntityType(), ConvertOptions.None, _model);
                 if (!find.Success)
                 {
                     find.Document.Content = document;
@@ -49,7 +50,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                         throw ExceptionCreator.CreateDbException(result);
                     }
                     //Convert document back to entity
-                    var output = await converter.ToEdmEntityObject(document, tenantId, _singleton.EntityType());
+                    var output = converter.ToEdmEntityObject(document, tenantId, _singleton.EntityType());
 
                     return output;
                 }
@@ -70,7 +71,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                     }
 
                     //Convert document back to entity
-                    var output = await converter.ToEdmEntityObject(find.Content, tenantId, _singleton.EntityType());
+                    var output = converter.ToEdmEntityObject(find.Content, tenantId, _singleton.EntityType());
 
                     return output;
                 }

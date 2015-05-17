@@ -37,7 +37,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                 var originalId = await Helpers.CreateEntityId(tenantId, _keys, _entityType);
                 var id = await Helpers.CreateEntityId(tenantId, _keys, _entity, _entityType);
 
-                var converter = new EntityObjectConverter();
+                var converter = new EntityObjectConverter(new KeyGenerator());
 
                 //Get the current version
                 var find = bucket.GetDocument<JObject>(originalId);
@@ -46,7 +46,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                     throw ExceptionCreator.CreateDbException(find);
                 }
 
-                var document = await converter.ToDocument(_entity, tenantId, _entityType, false, _model);
+                //TODO: Convert Options
+                var document = await converter.ToDocument(_entity, tenantId, _entityType, ConvertOptions.None, _model);
                 var mergeSettings = new JsonMergeSettings
                 {
                     MergeArrayHandling = MergeArrayHandling.Union,
@@ -83,7 +84,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                 }
 
                 //Convert document back to entity
-                var output = await converter.ToEdmEntityObject(find.Content, tenantId, _entityType);
+                var output = converter.ToEdmEntityObject(find.Content, tenantId, _entityType);
 
                 return output;
             }

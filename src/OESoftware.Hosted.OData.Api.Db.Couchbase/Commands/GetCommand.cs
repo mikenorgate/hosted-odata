@@ -37,9 +37,9 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                     throw ExceptionCreator.CreateDbException(result);
                 }
 
-                var converter = new EntityObjectConverter();
+                var converter = new EntityObjectConverter(new KeyGenerator());
                 //Convert document back to entity
-                var output = await converter.ToEdmEntityObject(result.Value, tenantId, _entityType);
+                var output = converter.ToEdmEntityObject(result.Value, tenantId, _entityType);
 
                 return output;
             }

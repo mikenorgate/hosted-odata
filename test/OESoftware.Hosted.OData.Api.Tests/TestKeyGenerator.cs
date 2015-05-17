@@ -6,7 +6,7 @@ using OESoftware.Hosted.OData.Api.Models;
 
 namespace OESoftware.Hosted.OData.Api.Tests
 {
-    public class TestKeyGenerator : IKeyGenerator
+    public class TestKeyGenerator : IValueGenerator
     {
         public async Task<object> CreateKey(string dbIdentifier, string keyName, IEdmType type, IEdmType entityType)
         {

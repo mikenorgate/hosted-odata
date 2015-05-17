@@ -11,14 +11,9 @@ using System.Web.OData.Extensions;
 using System.Web.OData.Query;
 using System.Web.OData.Results;
 using System.Web.OData.Routing;
-using Microsoft.OData.Core;
 using Microsoft.OData.Edm;
-using Microsoft.OData.Edm.Library;
-using Microsoft.OData.Edm.Vocabularies.V1;
-using Newtonsoft.Json.Linq;
 using OESoftware.Hosted.OData.Api.Attributes;
 using OESoftware.Hosted.OData.Api.Db;
-using OESoftware.Hosted.OData.Api.Db.Couchbase;
 using OESoftware.Hosted.OData.Api.Db.Couchbase.Commands;
 using OESoftware.Hosted.OData.Api.Extensions;
 
@@ -351,7 +346,6 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             return Ok(value);
         }
-        
 
         [ODataPath(EdmConstants.EntityPath)]
         public async Task<IHttpActionResult> DeleteItem()

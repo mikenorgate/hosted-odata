@@ -31,9 +31,10 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
             using (var bucket = BucketProvider.GetBucket())
             {
                 //Convert entity to document
-                var converter = new EntityObjectConverter();
+                var converter = new EntityObjectConverter(new KeyGenerator());
 
-                var document = await converter.ToDocument(_entity, tenantId, _entityType, true, _model);
+                //TODO: Convert Options
+                var document = await converter.ToDocument(_entity, tenantId, _entityType, ConvertOptions.None, _model);
 
                 var id = await Helpers.CreateEntityId(tenantId, _entity, _entityType);
 
@@ -52,7 +53,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                     throw ExceptionCreator.CreateDbException(find);
                 }
                 //Convert document back to entity
-                var output = await converter.ToEdmEntityObject(find.Value, tenantId, _entityType);
+                var output = converter.ToEdmEntityObject(find.Value, tenantId, _entityType);
 
                 return output;
             }

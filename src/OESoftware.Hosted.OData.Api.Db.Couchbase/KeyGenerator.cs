@@ -5,7 +5,7 @@ using OESoftware.Hosted.OData.Api.Core;
 
 namespace OESoftware.Hosted.OData.Api.Db.Couchbase
 {
-    public class KeyGenerator : IKeyGenerator
+    public class KeyGenerator : IValueGenerator
     {
         public async Task<object> CreateKey(string tenantId, string keyName, IEdmType keyType, IEdmType entityType)
         {

@@ -39,19 +39,14 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
 
                 var all = bucket.Get<JObject>(result.Value.Values<string>().ToList());
 
-                var converter = new EntityObjectConverter();
+                var converter = new EntityObjectConverter(new KeyGenerator());
 
                 var output = new IEdmEntityObject[all.Values.Count];
-                var tasks = new Task[all.Values.Count];
                 for (var i = 0; i < all.Values.Count; i++)
                 {
                     var i1 = i;
-                    tasks[i1] =
-                        converter.ToEdmEntityObject(all.Values.ElementAt(i1).Value, tenantId, _entityType)
-                            .ContinueWith((task) => { output[i1] = task.Result; });
+                    output[i] = converter.ToEdmEntityObject(all.Values.ElementAt(i1).Value, tenantId, _entityType);
                 }
-
-                await Task.WhenAll(tasks);
 
 
                 return new EdmEntityObjectCollection(new EdmCollectionTypeReference(new EdmCollectionType(new EdmEntityTypeReference(_entityType, false))), output.ToList());

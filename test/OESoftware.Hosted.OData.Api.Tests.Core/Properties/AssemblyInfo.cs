@@ -1,16 +1,15 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using OESoftware.Hosted.OData.Api.Core.Logging;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("OESoftware.Hosted.OData.Api.Core")]
+[assembly: AssemblyTitle("OESoftware.Hosted.OData.Api.Tests.Core")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("OESoftware.Hosted.OData.Api.Core")]
+[assembly: AssemblyProduct("OESoftware.Hosted.OData.Api.Tests.Core")]
 [assembly: AssemblyCopyright("Copyright ©  2015")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -21,7 +20,7 @@ using OESoftware.Hosted.OData.Api.Core.Logging;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("6fc272f8-43a8-4f46-9b47-105d485c2687")]
+[assembly: Guid("3e55332d-386b-4906-8d4e-7f7807ce7d81")]
 
 // Version information for an assembly consists of the following four values:
 //
@@ -35,5 +34,3 @@ using OESoftware.Hosted.OData.Api.Core.Logging;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
-
-[assembly: MethodLoggingAspect()]

@@ -1,0 +1,118 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:Reference Uri="http://docs.oasis-open.org/odata/odata/v4.0/os/vocabularies/Org.OData.Core.V1.xml">
+    <edmx:Include Alias="Core" Namespace="Org.OData.Core.V1"/>
+  </edmx:Reference>
+  <edmx:DataServices>
+    <Schema Namespace="Test" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityType Name="AllTypes">
+        <Property Name="Binary" Type="Edm.Binary" Nullable="false"></Property>
+        <Property Name="Boolean" Type="Edm.Boolean" Nullable="false"></Property>
+        <Property Name="Byte" Type="Edm.Byte" Nullable="false"></Property>
+        <Property Name="DateTime" Type="Edm.DateTime" Nullable="false"></Property>
+        <Property Name="Decimal" Type="Edm.Decimal" Nullable="false"></Property>
+        <Property Name="Double" Type="Edm.Double" Nullable="false"></Property>
+        <Property Name="Single" Type="Edm.Single" Nullable="false"></Property>
+        <Property Name="Guid" Type="Edm.Guid" Nullable="false"></Property>
+        <Property Name="Int16" Type="Edm.Int16" Nullable="false"></Property>
+        <Property Name="Int32" Type="Edm.Int32" Nullable="false"></Property>
+        <Property Name="Int64" Type="Edm.Int64" Nullable="false"></Property>
+        <Property Name="SByte" Type="Edm.SByte" Nullable="false"></Property>
+        <Property Name="String" Type="Edm.String" Nullable="false"></Property>
+        <Property Name="Time" Type="Edm.Time" Nullable="false"></Property>
+        <Property Name="DateTimeOffset" Type="Edm.DateTimeOffset" Nullable="false"></Property>
+        <Property Name="Complex" Type="Test.ComplexType" Nullable="false"></Property>
+        <Property Name="Enum" Type="Test.EnumType" Nullable="false"></Property>
+        <Property Name="Collection" Type="Collection(Edm.String)" Nullable="false"></Property>
+        <Property Name="CollectionComplex" Type="Collection(Test.ComplexType)" Nullable="false"></Property>
+      </EntityType>
+
+      <EntityType Name="AllTypesWithDefaults">
+        <Property Name="Boolean" Type="Edm.Boolean" Nullable="false" DefaultValue="true"></Property>
+        <Property Name="DateTime" Type="Edm.DateTime" Nullable="false" DefaultValue="2000-12-12T12:00"></Property>
+        <Property Name="Decimal" Type="Edm.Decimal" Nullable="false" DefaultValue="1.3"></Property>
+        <Property Name="Double" Type="Edm.Double" Nullable="false"  DefaultValue="1.3"></Property>
+        <Property Name="Single" Type="Edm.Single" Nullable="false"  DefaultValue="1.3"></Property>
+        <Property Name="Guid" Type="Edm.Guid" Nullable="false"  DefaultValue="83ad5540-dba8-420d-855a-6ee5a187e6cb"></Property>
+        <Property Name="Int16" Type="Edm.Int16" Nullable="false" DefaultValue="5"></Property>
+        <Property Name="Int32" Type="Edm.Int32" Nullable="false" DefaultValue="5"></Property>
+        <Property Name="Int64" Type="Edm.Int64" Nullable="false" DefaultValue="5"></Property>
+        <Property Name="SByte" Type="Edm.SByte" Nullable="false" DefaultValue="1"></Property>
+        <Property Name="String" Type="Edm.String" Nullable="false" DefaultValue="Test"></Property>
+        <Property Name="Time" Type="Edm.Time" Nullable="false" DefaultValue="13:20:00"></Property>
+        <Property Name="DateTimeOffset" Type="Edm.DateTimeOffset" Nullable="false" DefaultValue="2002-10-10T17:00:00Z"></Property>
+        <Property Name="Enum" Type="Test.EnumType" Nullable="false" DefaultValue="Enum2"></Property>
+      </EntityType>
+
+      <EntityType Name="AllComputedTypes">
+        <Property Name="DateTime" Type="Edm.DateTime" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Decimal" Type="Edm.Decimal" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Double" Type="Edm.Double" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Single" Type="Edm.Single" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Guid" Type="Edm.Guid" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Int16" Type="Edm.Int16" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Int32" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Int64" Type="Edm.Int64" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Time" Type="Edm.Time" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Complex" Type="Test.ComplexTypeWithComputed" Nullable="false"></Property>
+      </EntityType>
+
+      <EntityType Name="OpenEntity" OpenType="true">
+      </EntityType>
+
+      <EntityType Name="JustCollections">
+        <Property Name="PrimitiveCollection" Type="Collection(Edm.String)" Nullable="false"></Property>
+        <Property Name="ComplexCollection" Type="Collection(Test.ComplexType)" Nullable="false"></Property>
+        <Property Name="EnumCollection" Type="Collection(Test.EnumType)" Nullable="false"></Property>
+        <Property Name="EntityCollection" Type="Collection(Test.AllTypesWithDefaults)" Nullable="false"></Property>
+      </EntityType>
+
+      <ComplexType Name="ComplexType" OpenType="False">
+        <Property Name="Int1" Type="Edm.Int32" Nullable="false"></Property>
+        <Property Name="Int2" Type="Edm.Int32" Nullable="false"></Property>
+        <Property Name="Int3" Type="Edm.Int32" Nullable="false"></Property>
+      </ComplexType>
+
+      <ComplexType Name="ComplexTypeWithComputed" OpenType="False">
+        <Property Name="Int1" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Int2" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Int3" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+      </ComplexType>
+
+      <EnumType Name="EnumType">
+        <Member Name="Enum1" Value="0" />
+        <Member Name="Enum2" Value="1" />
+        <Member Name="Enum3" Value="2" />
+      </EnumType>
+    </Schema>
+    <Schema Namespace="ODataWebExperimental.Northwind.Model" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+      <EntityContainer xmlns:p4="http://schemas.microsoft.com/ado/2009/02/edm/annotation" Name="NorthwindEntities" p4:LazyLoadingEnabled="true">
+        
+      </EntityContainer>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>

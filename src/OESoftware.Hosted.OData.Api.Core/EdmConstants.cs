@@ -28,6 +28,9 @@ namespace OESoftware.Hosted.OData.Api.Core
         /// <summary>edm date primitive type name</summary>
         public const string EdmDateTypeName = "Edm.Date";
 
+        /// <summary>edm date time primitive type name</summary>
+        public const string EdmDateTimeTypeName = "Edm.DateTime";
+
         /// <summary>Represents a Time instance as an interval measured in milliseconds from an instance of DateTime.</summary>
         public const string EdmDateTimeOffsetTypeName = "Edm.DateTimeOffset";
 
@@ -66,6 +69,9 @@ namespace OESoftware.Hosted.OData.Api.Core
 
         /// <summary>edm timeOfDay primitive type name</summary>
         public const string EdmTimeOfDayTypeName = "Edm.TimeOfDay";
+
+        /// <summary>edm timeOfDay primitive type name</summary>
+        public const string EdmTimeTypeName = "Edm.Time";
 
         /// <summary>edm geography primitive type name</summary>
         public const string EdmGeographyTypeName = "Edm.Geography";
