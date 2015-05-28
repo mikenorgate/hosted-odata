@@ -1,4 +1,11 @@
-﻿using System;
+﻿// Copyright (C) 2015 Michael Norgate
+
+// This software may be modified and distributed under the terms of 
+// the Creative Commons Attribution Non-commercial license.  See the LICENSE file for details.
+
+#region usings
+
+using System;
 using System.Collections.Generic;
 using System.Data.HashFunction;
 using System.IO;
@@ -8,11 +15,24 @@ using System.Threading.Tasks;
 using System.Web.OData;
 using Microsoft.OData.Edm;
 
+#endregion
+
 namespace OESoftware.Hosted.OData.Api.Db.Couchbase
 {
+    /// <summary>
+    /// Helpers for db operations
+    /// </summary>
     public static class Helpers
     {
-        public async static Task<string> CreateEntityId(string tenantId, EdmEntityObject entity, IEdmEntityType entityType)
+        /// <summary>
+        /// Create a id key for a entity in a collection
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="entity"><see cref="EdmEntityObject"/></param>
+        /// <param name="entityType"><see cref="IEdmEntityType"/></param>
+        /// <returns>An id key</returns>
+        public static async Task<string> CreateEntityId(string tenantId, EdmEntityObject entity,
+            IEdmEntityType entityType)
         {
             var values = new List<string>();
             foreach (var property in entityType.DeclaredKey.OrderBy(k => k.Name))
@@ -36,7 +56,15 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             return string.Format("{0}:{1}:{2}", tenantId, entityType.FullTypeName(), await HashKeyValues(values));
         }
 
-        public async static Task<string> CreateEntityId(string tenantId, IDictionary<string, object> keys, IEdmEntityType entityType)
+        /// <summary>
+        /// Create a id key for a entity in a collection
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="keys">A dictionary of the entity keys</param>
+        /// <param name="entityType"><see cref="IEdmEntityType"/></param>
+        /// <returns>An id key</returns>
+        public static async Task<string> CreateEntityId(string tenantId, IDictionary<string, object> keys,
+            IEdmEntityType entityType)
         {
             var values = new List<string>();
             foreach (var property in entityType.DeclaredKey.OrderBy(k => k.Name))
@@ -52,7 +80,17 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             return string.Format("{0}:{1}:{2}", tenantId, entityType.FullTypeName(), await HashKeyValues(values));
         }
 
-        public async static Task<string> CreateEntityId(string tenantId, IDictionary<string, object> keys, EdmEntityObject entity, IEdmEntityType entityType)
+        /// <summary>
+        /// Create a id key for a entity in a collection
+        /// Takes the keys from keys if not in entity
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="keys">A dictionary of the entity keys</param>
+        /// <param name="entity"><see cref="EdmEntityObject"/></param>
+        /// <param name="entityType"><see cref="IEdmEntityType"/></param>
+        /// <returns>An id key</returns>
+        public static async Task<string> CreateEntityId(string tenantId, IDictionary<string, object> keys,
+            EdmEntityObject entity, IEdmEntityType entityType)
         {
             var values = new List<string>();
             foreach (var property in entityType.DeclaredKey.OrderBy(k => k.Name))
@@ -69,7 +107,6 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                 }
                 else
                 {
-
                     object value;
                     if (!entity.TryGetPropertyValue(property.Name, out value) || value == null)
                     {
@@ -83,18 +120,30 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             return string.Format("{0}:{1}:{2}", tenantId, entityType.FullTypeName(), await HashKeyValues(values));
         }
 
+        /// <summary>
+        /// Create a id key for the collection
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="entityType"><see cref="IEdmEntityType"/></param>
+        /// <returns>An id key</returns>
         public static string CreateCollectionId(string tenantId, IEdmEntityType entityType)
         {
             return string.Format("{0}:c:{1}", tenantId, entityType.FullTypeName());
         }
 
+        /// <summary>
+        /// Create a id key for the singleton
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="singleton"><see cref="IEdmSingleton"/></param>
+        /// <returns>An id key</returns>
         public static string CreateSingletonId(string tenantId, IEdmSingleton singleton)
         {
             return string.Format("{0}:{1}", tenantId, singleton.EntityType().FullTypeName());
         }
 
         /// <summary>
-        /// Create a hash from a list of values
+        ///     Create a hash from a list of values
         /// </summary>
         /// <param name="values">The list of values</param>
         /// <returns>A 64bit hash</returns>
@@ -110,8 +159,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
 
         private static Stream GenerateStreamFromString(string s)
         {
-            MemoryStream stream = new MemoryStream();
-            StreamWriter writer = new StreamWriter(stream);
+            var stream = new MemoryStream();
+            var writer = new StreamWriter(stream);
             writer.Write(s);
             writer.Flush();
             stream.Position = 0;
@@ -120,10 +169,10 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
 
         public static string ToHex(byte[] bytes)
         {
-            StringBuilder result = new StringBuilder(bytes.Length * 2);
+            var result = new StringBuilder(bytes.Length*2);
 
-            for (int i = 0; i < bytes.Length; i++)
-                result.Append(bytes[i].ToString("x2"));
+            foreach (byte t in bytes)
+                result.Append(t.ToString("x2"));
 
             return result.ToString();
         }

@@ -85,6 +85,15 @@
         <Property Name="EntityCollection" Type="Collection(Test.AllTypesWithDefaults)" Nullable="false"></Property>
       </EntityType>
 
+      <EntityType Name="SimpleWithKey">
+        <Key>
+          <PropertyRef Name="Int32"/>
+        </Key>
+        <Property Name="Int32" Type="Edm.Int32" Nullable="false"></Property>
+        <Property Name="Prop1" Type="Edm.String" Nullable="false"></Property>
+        <Property Name="Prop2" Type="Edm.String" Nullable="false"></Property>
+      </EntityType>
+
       <ComplexType Name="ComplexType" OpenType="False">
         <Property Name="Int1" Type="Edm.Int32" Nullable="false"></Property>
         <Property Name="Int2" Type="Edm.Int32" Nullable="false"></Property>
@@ -108,10 +117,15 @@
         <Member Name="Enum2" Value="1" />
         <Member Name="Enum3" Value="2" />
       </EnumType>
+
+      <EntityType Name="Singleton">
+        <Property Name="ItemId" Type="Edm.Int32" Nullable="false">
+        </Property>
+      </EntityType>
     </Schema>
     <Schema Namespace="ODataWebExperimental.Northwind.Model" xmlns="http://docs.oasis-open.org/odata/ns/edm">
-      <EntityContainer xmlns:p4="http://schemas.microsoft.com/ado/2009/02/edm/annotation" Name="NorthwindEntities" p4:LazyLoadingEnabled="true">
-        
+      <EntityContainer xmlns:p4="http://schemas.microsoft.com/ado/2009/02/edm/annotation" Name="TestEntities" p4:LazyLoadingEnabled="true">
+        <Singleton Name="Singleton" Type="Test.Singleton" />
       </EntityContainer>
     </Schema>
   </edmx:DataServices>

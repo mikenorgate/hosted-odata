@@ -51,9 +51,10 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         public async Task<IHttpActionResult> GetSingleton()
         {
             var entityType = SingletonFromPath();
+            var model = Request.ODataProperties().Model;
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new GetSingletonCommand(entityType);
+            var command = new GetSingletonCommand(entityType, model);
             try
             {
                 var result = await command.Execute(dbIdentifier);
@@ -105,9 +106,10 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var entityType = SingletonFromPath();
 
             var path = Request.ODataProperties().Path;
+            var model = Request.ODataProperties().Model;
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new GetSingletonCommand(entityType);
+            var command = new GetSingletonCommand(entityType, model);
             try
             {
                 var result = await command.Execute(dbIdentifier);

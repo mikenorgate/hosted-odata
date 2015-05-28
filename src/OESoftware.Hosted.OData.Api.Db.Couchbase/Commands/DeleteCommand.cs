@@ -1,37 +1,49 @@
-﻿using System;
+﻿// Copyright (C) 2015 Michael Norgate
+
+// This software may be modified and distributed under the terms of 
+// the Creative Commons Attribution Non-commercial license.  See the LICENSE file for details.
+
+#region usings
+
 using System.Collections.Generic;
-using System.Data.Common;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using System.Web.OData;
-using Couchbase;
-using Couchbase.Core;
 using Microsoft.OData.Edm;
-using Newtonsoft.Json.Linq;
+
+#endregion
 
 namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
 {
+    /// <summary>
+    /// Delete an entity by key
+    /// </summary>
     public class DeleteCommand : IDbCommand
     {
-        private IEdmEntityType _entityType;
-        private IDictionary<string, object> _keys;
+        private readonly IEdmEntityType _entityType;
+        private readonly IDictionary<string, object> _keys;
 
+        /// <summary>
+        /// Default constructor
+        /// </summary>
+        /// <param name="keys">A dictionary of the keys for the entity</param>
+        /// <param name="entityType">The <see cref="IEdmEntityType"/> of the collection</param>
         public DeleteCommand(IDictionary<string, object> keys, IEdmEntityType entityType)
         {
             _keys = keys;
             _entityType = entityType;
         }
 
+        /// <summary>
+        /// Execute this command
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <returns>void</returns>
         public async Task Execute(string tenantId)
         {
             using (var bucket = BucketProvider.GetBucket())
             {
-                //Convert entity to document
-                var id = CreateId(tenantId);
+                var id = await Helpers.CreateEntityId(tenantId, _keys, _entityType);
 
-                var result = bucket.Remove(id);
+                var result = await bucket.RemoveAsync(id);
                 if (!result.Success)
                 {
                     throw ExceptionCreator.CreateDbException(result);
@@ -40,27 +52,6 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                 var removeFromCollection = new RemoveFromCollectionCommand(id, _entityType);
                 await removeFromCollection.Execute(tenantId);
             }
-        }
-
-        private string CreateId(string tenantId)
-        {
-            var values = new List<string>();
-            foreach (var property in _entityType.DeclaredKey.OrderBy(k=>k.Name))
-            {
-                if (!_keys.ContainsKey(property.Name))
-                {
-                    throw new KeyNotFoundException(string.Format("No value for key {0} was found", property.Name));
-                }
-
-                values.Add(_keys[property.Name].ToString());
-            }
-
-           return string.Format("{0}:{1}:{2}", tenantId, _entityType.FullTypeName(), string.Join("_", values));
-        }
-
-        Task IDbCommand.Execute(string tenantId)
-        {
-            return Execute(tenantId);
         }
     }
 }

@@ -1,26 +1,41 @@
-﻿using System;
+﻿// Copyright (C) 2015 Michael Norgate
+
+// This software may be modified and distributed under the terms of 
+// the Creative Commons Attribution Non-commercial license.  See the LICENSE file for details.
+
+#region usings
+
+using System;
 using System.Collections.Generic;
-using System.Data.Common;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Web.OData;
 using Couchbase;
-using Couchbase.Core;
 using Microsoft.OData.Edm;
 using Newtonsoft.Json.Linq;
 
+#endregion
+
 namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
 {
+    /// <summary>
+    /// Replace an entity value
+    /// </summary>
     public class ReplaceCommand : IDbCommand
     {
-        private IEdmEntityType _entityType;
-        private EdmEntityObject _entity;
-        private IDictionary<string, object> _keys;
-        private IEdmModel _model;
+        private readonly EdmEntityObject _entity;
+        private readonly IEdmEntityType _entityType;
+        private readonly IDictionary<string, object> _keys;
+        private readonly IEdmModel _model;
 
-        public ReplaceCommand(IDictionary<string, object> keys, EdmEntityObject entity, IEdmEntityType entityType, IEdmModel model)
+        /// <summary>
+        /// Default Construtor
+        /// </summary>
+        /// <param name="keys">A dictionary of the keys for the entity</param>
+        /// <param name="entity"><see cref="EdmEntityObject"/> to insert</param>
+        /// <param name="entityType">The <see cref="IEdmEntityType"/> of the collection</param>
+        /// <param name="model">The <see cref="IEdmModel"/> containing the type</param>
+        public ReplaceCommand(IDictionary<string, object> keys, EdmEntityObject entity, IEdmEntityType entityType,
+            IEdmModel model)
         {
             _entity = entity;
             _entityType = entityType;
@@ -28,6 +43,16 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
             _model = model;
         }
 
+        Task IDbCommand.Execute(string tenantId)
+        {
+            return Execute(tenantId);
+        }
+
+        /// <summary>
+        /// Execute this command
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <returns><see cref="EdmEntityObject"/></returns>
         public async Task<EdmEntityObject> Execute(string tenantId)
         {
             using (var bucket = BucketProvider.GetBucket())
@@ -36,29 +61,28 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                 var originalId = await Helpers.CreateEntityId(tenantId, _keys, _entityType);
                 var id = await Helpers.CreateEntityId(tenantId, _keys, _entity, _entityType);
 
-                var converter = new EntityObjectConverter(new KeyGenerator());
+                var converter = new EntityObjectConverter(new ValueGenerator());
 
                 //Get the current version
-                var find = bucket.GetDocument<JObject>(originalId);
+                var find = await bucket.GetDocumentAsync<JObject>(originalId);
                 if (!find.Success)
                 {
                     throw ExceptionCreator.CreateDbException(find);
                 }
 
-                //TODO: Convert Options
                 var document = await converter.ToDocument(_entity, tenantId, _entityType, ConvertOptions.None, _model);
 
-                var replaceDocument = new Document<JObject>()
+                var replaceDocument = new Document<JObject>
                 {
                     Id = find.Document.Id,
                     Cas = find.Document.Cas,
                     Content = document
                 };
-                
+
                 //If the key hasn't changed then replace
                 if (originalId.Equals(id, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    var result = bucket.Replace(replaceDocument);
+                    var result = await bucket.ReplaceAsync(replaceDocument);
                     if (!result.Success)
                     {
                         throw ExceptionCreator.CreateDbException(result);
@@ -66,32 +90,33 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                 }
                 else
                 {
+                    replaceDocument.Id = id;
+
+                    var result = await bucket.InsertAsync(replaceDocument);
+                    if (!result.Success)
+                    {
+                        throw ExceptionCreator.CreateDbException(result);
+                    }
+
                     //If the key has changed remove the old and insert
-                    var remove = bucket.Remove(originalId);
+                    var remove = await bucket.RemoveAsync(originalId);
                     if (!remove.Success)
                     {
                         throw ExceptionCreator.CreateDbException(remove);
                     }
 
-                    replaceDocument.Id = id;
+                    var addToCollectionCommand = new AddToCollectionCommand(id, _entityType);
+                    await addToCollectionCommand.Execute(tenantId);
 
-                    var result = bucket.Insert(replaceDocument);
-                    if (!result.Success)
-                    {
-                        throw ExceptionCreator.CreateDbException(result);
-                    }
+                    var removeFromCollectionCommand = new RemoveFromCollectionCommand(originalId, _entityType);
+                    await removeFromCollectionCommand.Execute(tenantId);
                 }
 
                 //Convert document back to entity
-                var output = converter.ToEdmEntityObject(find.Content, tenantId, _entityType);
+                var output = converter.ToEdmEntityObject(replaceDocument.Content, tenantId, _entityType);
 
                 return output;
             }
-        }
-
-        Task IDbCommand.Execute(string tenantId)
-        {
-            return Execute(tenantId);
         }
     }
 }

@@ -1,33 +1,49 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (C) 2015 Michael Norgate
+// 
+// This software may be modified and distributed under the terms of 
+// the Creative Commons Attribution Non-commercial license.  See the LICENSE file for details.
+
+#region usings
+
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using System.Web.OData;
-using Couchbase;
-using Couchbase.IO;
 using Microsoft.OData.Edm;
 using Newtonsoft.Json.Linq;
 
+#endregion
+
 namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
 {
+    /// <summary>
+    /// Removes an id from a collection
+    /// </summary>
     public class RemoveFromCollectionCommand : IDbCommand
     {
-        private IEdmEntityType _entityType;
-        private string _key;
+        private readonly IEdmEntityType _entityType;
+        private readonly string _key;
 
+        /// <summary>
+        /// Default Constructor
+        /// </summary>
+        /// <param name="key">The key to remove from the collection</param>
+        /// <param name="entityType">The <see cref="IEdmEntityType"/> of the collection</param>
         public RemoveFromCollectionCommand(string key, IEdmEntityType entityType)
         {
             _key = key;
             _entityType = entityType;
         }
-
+        
+        /// <summary>
+        /// Execute this command
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <returns>void</returns>
         public async Task Execute(string tenantId)
         {
             using (var bucket = BucketProvider.GetBucket())
             {
                 var id = Helpers.CreateCollectionId(tenantId, _entityType);
-                var existing = bucket.GetDocument<JArray>(id);
+                var existing = await bucket.GetDocumentAsync<JArray>(id);
                 if (existing.Success)
                 {
                     var match = existing.Content.FirstOrDefault(j => j.Value<string>().Equals(_key));
@@ -37,7 +53,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                         return;
                     }
                     existing.Document.Content.Remove(match);
-                    var updateResult = bucket.Replace(existing.Document);
+                    var updateResult = await bucket.ReplaceAsync(existing.Document);
                     if (!updateResult.Success)
                     {
                         //If the update failed then another thread got there first

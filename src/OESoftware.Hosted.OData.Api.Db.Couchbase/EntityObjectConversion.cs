@@ -290,7 +290,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                                 .Any(v => v.Term.FullName() == CoreVocabularyConstants.Computed))
                     let key1 = key
                     select
-                        _valueGenerator.CreateKey(tenantId, key.Name, key.Type.Definition, entityType)
+                        _valueGenerator.ComputeValue(tenantId, key.Name, key.Type.Definition, entityType)
                             .ContinueWith(task =>
                             {
                                 entity.TrySetPropertyValue(key1.Name, task.Result);

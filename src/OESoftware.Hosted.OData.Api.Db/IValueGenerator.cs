@@ -5,6 +5,6 @@ namespace OESoftware.Hosted.OData.Api.Db
 {
     public interface IValueGenerator
     {
-        Task<object> CreateKey(string tenantId, string keyName, IEdmType keyType, IEdmType entityType);
+        Task<object> ComputeValue(string tenantId, string propertyName, IEdmType propertyType, IEdmType entityType);
     }
 }

@@ -36,6 +36,13 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Couchbase.NetClient, Version=2.1.0.0, Culture=neutral, PublicKeyToken=05e9c6b5a9ec94c2, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\packages\CouchbaseNetClient.2.1.0\lib\net45\Couchbase.NetClient.dll</HintPath>
+    </Reference>
+    <Reference Include="Couchbase.NetClient.2.1.0.0.Fakes">
+      <HintPath>FakesAssemblies\Couchbase.NetClient.2.1.0.0.Fakes.dll</HintPath>
+    </Reference>
     <Reference Include="log4net, Version=1.2.13.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\packages\log4net.2.0.3\lib\net40-full\log4net.dll</HintPath>
@@ -47,8 +54,14 @@
     <Reference Include="Microsoft.OData.Edm">
       <HintPath>..\..\packages\Microsoft.OData.Edm.6.10.0\lib\portable-net40+sl5+wp8+win8+wpa\Microsoft.OData.Edm.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.QualityTools.Testing.Fakes, Version=12.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\..\packages\Newtonsoft.Json.6.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="OESoftware.Hosted.OData.Api.Db.Couchbase.Fakes">
+      <HintPath>FakesAssemblies\OESoftware.Hosted.OData.Api.Db.Couchbase.Fakes.dll</HintPath>
     </Reference>
     <Reference Include="PostSharp">
       <HintPath>..\..\packages\PostSharp.4.1.13\lib\net35-client\PostSharp.dll</HintPath>
@@ -73,6 +86,17 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="Commands\GetSingletonCommandTests.cs" />
+    <Compile Include="Commands\GetCommandTests.cs" />
+    <Compile Include="Commands\UpdateSingletonCommandTests.cs" />
+    <Compile Include="Commands\UpdateCommandTests.cs" />
+    <Compile Include="Commands\ReplaceSingletonCommandTests.cs" />
+    <Compile Include="Commands\ReplaceCommandTests.cs" />
+    <Compile Include="Commands\RemoveFromCollectionCommandTests.cs" />
+    <Compile Include="Commands\AddToCollectionCommandTests.cs" />
+    <Compile Include="Commands\DeleteCommandTests.cs" />
+    <Compile Include="Commands\GetAllCommandTests.cs" />
+    <Compile Include="Commands\InsertCommandTests.cs" />
     <Compile Include="EntityObjectConversionTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestDataModel1.Designer.cs">
@@ -83,6 +107,8 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Fakes Include="Fakes\OESoftware.Hosted.OData.Api.Db.Couchbase.fakes" />
+    <Fakes Include="Fakes\Couchbase.NetClient.fakes" />
     <None Include="packages.config" />
     <None Include="TestDataModel.xml">
       <Generator>EntityModelCodeGenerator</Generator>
