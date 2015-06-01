@@ -165,9 +165,9 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var command = new InsertCommand(entity, entityType, model);
             try
             {
-                await command.Execute(dbIdentifier);
+                var output = await command.Execute(dbIdentifier);
 
-                return Created(entity, entityType);
+                return Created(output, entityType);
             }
             catch (DbException ex)
             {
@@ -309,45 +309,61 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
         [ODataPath(EdmConstants.EntityPropertyPath)]
         [ODataPath(EdmConstants.EntityRawPropertyPath)]
-        public async Task<IHttpActionResult> PutItemProperty([FromBody]string value)
+        public IHttpActionResult PutItemProperty()
         {
-            var entityType = EntityTypeFromPath();
+            //var entityType = EntityTypeFromPath();
+            //var path = Request.ODataProperties().Path;
 
-            var path = Request.ODataProperties().Path;
+            //var updateEntity = new EdmEntityObject(entityType);
 
-            var updateEntity = new EdmEntityObject(entityType);
+            //EdmStructuredObject propertyEntity = updateEntity;
+            //IEdmStructuredType propertyType = entityType;
+            //foreach (var oDataPathSegment in path.Segments.Where(s=>s is PropertyAccessPathSegment))
+            //{
+            //    var pathSegment = (PropertyAccessPathSegment) oDataPathSegment;
+            //    if (
+            //        propertyType != null && propertyType.DeclaredProperties.Any(
+            //            p => p.Name.Equals(pathSegment.PropertyName, StringComparison.InvariantCultureIgnoreCase)))
+            //    {
+            //        if (pathSegment.Property.Type.IsPrimitive())
+            //        {
+            //            propertyEntity.TrySetPropertyValue(pathSegment.PropertyName, value);
+            //        }
+            //        else
+            //        {
+            //            propertyType = pathSegment.Property.Type.Definition as IEdmComplexType;
+            //            var complex = new EdmComplexObject((IEdmComplexType)propertyType);
+            //            propertyEntity.TrySetPropertyValue(pathSegment.PropertyName, complex);
+            //            propertyEntity = complex;
+            //        }
+            //    }
+            //    else
+            //    {
+            //        return NotFound();
+            //    }
+            //}
 
-            EdmStructuredObject propertyEntity = updateEntity;
-            IEdmStructuredType propertyType = entityType;
-            foreach (var oDataPathSegment in path.Segments.Where(s=>s is PropertyAccessPathSegment))
-            {
-                var pathSegment = (PropertyAccessPathSegment) oDataPathSegment;
-                if (
-                    propertyType != null && propertyType.DeclaredProperties.Any(
-                        p => p.Name.Equals(pathSegment.PropertyName, StringComparison.InvariantCultureIgnoreCase)))
-                {
-                    if (pathSegment.Property.Type.IsPrimitive())
-                    {
-                        propertyEntity.TrySetPropertyValue(pathSegment.PropertyName, value);
-                    }
-                    else
-                    {
-                        propertyType = pathSegment.Property.Type.Definition as IEdmComplexType;
-                        var complex = new EdmComplexObject((IEdmComplexType)propertyType);
-                        propertyEntity.TrySetPropertyValue(pathSegment.PropertyName, complex);
-                        propertyEntity = complex;
-                    }
-                }
-                else
-                {
-                    return NotFound();
-                }
-            }
+            //await PatchItem(updateEntity);
 
-            await PatchItem(updateEntity);
+            //return Ok(value);
 
-            return Ok(value);
+            return new StatusCodeResult(HttpStatusCode.MethodNotAllowed, this);
         }
+
+        [ODataPath(EdmConstants.EntityPropertyPath)]
+        [ODataPath(EdmConstants.EntityRawPropertyPath)]
+        public IHttpActionResult PatchItemProperty()
+        {
+            return new StatusCodeResult(HttpStatusCode.MethodNotAllowed, this);
+        }
+
+        [ODataPath(EdmConstants.EntityPropertyPath)]
+        [ODataPath(EdmConstants.EntityRawPropertyPath)]
+        public IHttpActionResult DeletetemProperty()
+        {
+            return new StatusCodeResult(HttpStatusCode.MethodNotAllowed, this);
+        }
+
 
         [ODataPath(EdmConstants.EntityPath)]
         public async Task<IHttpActionResult> DeleteItem()

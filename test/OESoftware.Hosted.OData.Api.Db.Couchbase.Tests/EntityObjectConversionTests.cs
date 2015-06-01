@@ -58,7 +58,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests
             Assert.AreEqual(0, result["Int32"]);
             Assert.AreEqual(0, result["Int64"]);
             Assert.AreEqual(0, result["SByte"]);
-            Assert.AreEqual(null, result["String"].Value<string>());
+            Assert.AreEqual(string.Empty, result["String"].Value<string>());
             Assert.AreEqual(new DateTimeOffset(), result["DateTimeOffset"]);
             Assert.IsNotNull(result["Collection"] as JArray);
             Assert.AreEqual(0, (result["Collection"] as JArray).Count);
@@ -335,6 +335,42 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests
             Assert.AreEqual(14, (entityCollection[1] as JObject).Properties().Count());
         }
 
+        [TestMethod]
+        public void ToDocument_CopiesAllPropertiesFromInheritance_CreateJObject()
+        {
+            var type = _model.FindDeclaredType("Test.SubInheritedType") as IEdmEntityType;
+
+            var obj = new EdmEntityObject(type);
+            obj.TrySetPropertyValue("Int32", 12);
+            obj.TrySetPropertyValue("Prop1", "value1");
+            obj.TrySetPropertyValue("Prop2", "value2");
+
+            var converter = new EntityObjectConverter(new TestValueGenerator());
+            var result = converter.ToDocument(obj, "", type, ConvertOptions.None, _model).Result;
+
+            Assert.AreEqual(12, result["Int32"]);
+            Assert.AreEqual("value1", result["Prop1"]);
+            Assert.AreEqual("value2", result["Prop2"]);
+        }
+
+        [TestMethod]
+        public void ToDocument_ComplexCopiesAllPropertiesFromInheritance_CreateJObject()
+        {
+            var type = _model.FindDeclaredType("Test.ComplexSubInheritedType") as IEdmComplexType;
+
+            var obj = new EdmComplexObject(type);
+            obj.TrySetPropertyValue("Int32", 12);
+            obj.TrySetPropertyValue("Prop1", "value1");
+            obj.TrySetPropertyValue("Prop2", "value2");
+
+            var converter = new EntityObjectConverter(new TestValueGenerator());
+            var result = converter.ToDocument(obj, "", type, ConvertOptions.None, _model).Result;
+
+            Assert.AreEqual(12, result["Int32"]);
+            Assert.AreEqual("value1", result["Prop1"]);
+            Assert.AreEqual("value2", result["Prop2"]);
+        }
+
         #endregion
 
         #region ToEdmEntityObject
@@ -363,7 +399,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests
             Assert.AreEqual((Int32)0, GetValue(result, "Int32"));
             Assert.AreEqual((Int64)0, GetValue(result, "Int64"));
             Assert.AreEqual((SByte)0, GetValue(result, "SByte"));
-            Assert.AreEqual(null, GetValue(result,"String"));
+            Assert.AreEqual(string.Empty, GetValue(result,"String"));
             Assert.AreEqual(new DateTimeOffset(), GetValue(result, "DateTimeOffset"));
 
             var time = (TimeOfDay)GetValue(result, "Time");
@@ -423,20 +459,40 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests
             Assert.AreEqual("Test1", primitiveCollection[0]);
             Assert.AreEqual("Test2", primitiveCollection[1]);
 
-            var complexCollection = GetValue(result,"ComplexCollection") as List<EdmComplexObject>;
+            var complexCollection = GetValue(result,"ComplexCollection") as EdmComplexObjectCollection;
             Assert.AreEqual(2, complexCollection.Count);
-            Assert.AreEqual(3, complexCollection[0].GetChangedPropertyNames().Count());
-            Assert.AreEqual(3, complexCollection[1].GetChangedPropertyNames().Count());
+            Assert.AreEqual(3, ((EdmComplexObject)complexCollection[0]).GetChangedPropertyNames().Count());
+            Assert.AreEqual(3, ((EdmComplexObject)complexCollection[1]).GetChangedPropertyNames().Count());
 
-            var enumCollection = GetValue(result,"EnumCollection") as List<EdmEnumObject>;
+            var enumCollection = GetValue(result,"EnumCollection") as EdmEnumObjectCollection;
             Assert.AreEqual(2, enumCollection.Count);
-            Assert.AreEqual("Enum3", enumCollection[0].Value);
-            Assert.AreEqual("Enum2", enumCollection[1].Value);
+            Assert.AreEqual("Enum3", ((EdmEnumObject)enumCollection[0]).Value);
+            Assert.AreEqual("Enum2", ((EdmEnumObject)enumCollection[1]).Value);
 
-            var entityCollection = GetValue(result,"EntityCollection") as List<EdmEntityObject>;
+            var entityCollection = GetValue(result,"EntityCollection") as EdmEntityObjectCollection;
             Assert.AreEqual(2, entityCollection.Count);
-            Assert.AreEqual(14, entityCollection[0].GetChangedPropertyNames().Count());
-            Assert.AreEqual(14, entityCollection[1].GetChangedPropertyNames().Count());
+            Assert.AreEqual(14, ((EdmEntityObject)entityCollection[0]).GetChangedPropertyNames().Count());
+            Assert.AreEqual(14, ((EdmEntityObject)entityCollection[1]).GetChangedPropertyNames().Count());
+        }
+
+        [TestMethod]
+        public void ToEdmEntityObject_CopiesInheritedValues_CreateEntityObject()
+        {
+            var type = _model.FindDeclaredType("Test.SubInheritedType") as IEdmEntityType;
+
+            var obj = new EdmEntityObject(type);
+            obj.TrySetPropertyValue("Int32", 12);
+            obj.TrySetPropertyValue("Prop1", "value1");
+            obj.TrySetPropertyValue("Prop2", "value2");
+
+            var converter = new EntityObjectConverter(new TestValueGenerator());
+            var jObject = converter.ToDocument(obj, "", type, ConvertOptions.None, _model).Result;
+
+            var result = converter.ToEdmEntityObject(jObject, "", type);
+
+            Assert.AreEqual(12, GetValue(result, "Int32"));
+            Assert.AreEqual("value1", GetValue(result, "Prop1"));
+            Assert.AreEqual("value2", GetValue(result, "Prop2"));
         }
 
         private object GetValue(IEdmStructuredObject entity, string propertyName)

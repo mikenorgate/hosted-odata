@@ -101,6 +101,49 @@
         <Property Name="NonComputed" Type="Edm.Guid" Nullable="false">
         </Property>
       </EntityType>
+
+      <EntityType Name="AllTypes">
+        <Key>
+          <PropertyRef Name="KeyProperty"/>
+        </Key>
+        <Property Name="KeyProperty" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+        <Property Name="Boolean" Type="Edm.Boolean" Nullable="false"></Property>
+        <Property Name="Byte" Type="Edm.Byte" Nullable="false"></Property>
+        <!--<Property Name="DateTime" Type="Edm.DateTime" Nullable="false"></Property>-->
+        <Property Name="Decimal" Type="Edm.Decimal" Nullable="false"></Property>
+        <Property Name="Double" Type="Edm.Double" Nullable="false"></Property>
+        <Property Name="Single" Type="Edm.Single" Nullable="false"></Property>
+        <Property Name="Guid" Type="Edm.Guid" Nullable="false"></Property>
+        <Property Name="Int16" Type="Edm.Int16" Nullable="false"></Property>
+        <Property Name="Int32" Type="Edm.Int32" Nullable="false"></Property>
+        <Property Name="Int64" Type="Edm.Int64" Nullable="false"></Property>
+        <Property Name="SByte" Type="Edm.SByte" Nullable="false"></Property>
+        <Property Name="String" Type="Edm.String" Nullable="false"></Property>
+        <!--<Property Name="Time" Type="Edm.Time" Nullable="false"></Property>-->
+        <Property Name="DateTimeOffset" Type="Edm.DateTimeOffset" Nullable="false"></Property>
+        <Property Name="Complex" Type="NorthwindModel.Press" Nullable="false"></Property>
+        <Property Name="Enum" Type="NorthwindModel.Category" Nullable="false"></Property>
+        <!--<Property Name="Collection" Type="Collection(Edm.String)" Nullable="false"></Property>-->
+        <Property Name="CollectionComplex" Type="Collection(NorthwindModel.Press)" Nullable="false"></Property>
+      </EntityType>
+
+      <EntityType Name="BaseEntity">
+        <Key>
+          <PropertyRef Name="ItemId"/>
+        </Key>
+        <Property Name="ItemId" Type="Edm.Int32" Nullable="false">
+          <Annotation Term="Core.Computed" Bool="true" />
+        </Property>
+      </EntityType>
+
+      <EntityType Name="InheritedEntity" BaseType="NorthwindModel.BaseEntity">
+        <Property Name="ItemGuid" Type="Edm.Guid" Nullable="false">
+        </Property>
+        <Property Name="NonComputed" Type="Edm.Guid" Nullable="false">
+        </Property>
+      </EntityType>
     </Schema>
     <Schema Namespace="ODataWebExperimental.Northwind.Model" xmlns="http://docs.oasis-open.org/odata/ns/edm">
       <EntityContainer xmlns:p4="http://schemas.microsoft.com/ado/2009/02/edm/annotation" Name="NorthwindEntities" p4:LazyLoadingEnabled="true">
@@ -109,6 +152,8 @@
         <EntitySet Name="EntityMixedProperties" EntityType="NorthwindModel.EntityMixedProperties" />
         <EntitySet Name="EntityWithOneKey" EntityType="NorthwindModel.EntityWithOneKey" />
         <EntitySet Name="EntityWithComplexTypes" EntityType="NorthwindModel.EntityWithComplexTypes" />
+        <EntitySet Name="AllTypes" EntityType="NorthwindModel.AllTypes" />
+        <EntitySet Name="InheritedEntities" EntityType="NorthwindModel.InheritedEntity" />
         <Singleton Name="Singleton" Type="NorthwindModel.Singleton" />
       </EntityContainer>
     </Schema>

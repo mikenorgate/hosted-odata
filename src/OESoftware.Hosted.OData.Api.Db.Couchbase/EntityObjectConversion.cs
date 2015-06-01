@@ -14,6 +14,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Web.OData;
 using Microsoft.OData.Edm;
+using Microsoft.OData.Edm.Library;
 using Microsoft.OData.Edm.Vocabularies.V1;
 using Newtonsoft.Json.Linq;
 using OESoftware.Hosted.OData.Api.Core;
@@ -79,8 +80,9 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             ConvertOptions options, IEdmModel model)
         {
             Contract.Requires(model != null);
-            var properties =
-                entityType.DeclaredProperties.Where(
+            var properties = GetAllProperties(entityType);
+
+            properties = properties.Where(
                     p =>
                         (entityType.NavigationProperties() == null || !entityType.NavigationProperties()
                             .Any(
@@ -88,12 +90,12 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                                     n.ReferentialConstraint.PropertyPairs.Any(
                                         r =>
                                             r.DependentProperty.Name.Equals(p.Name,
-                                                StringComparison.InvariantCultureIgnoreCase)))));
+                                                StringComparison.InvariantCultureIgnoreCase))))).ToList();
 
             if ((options & ConvertOptions.CopyOnlySet) == ConvertOptions.CopyOnlySet)
             {
                 var changedProperties = entity.GetChangedPropertyNames();
-                properties = properties.Where(p => changedProperties.Contains(p.Name));
+                properties = properties.Where(p => changedProperties.Contains(p.Name)).ToList();
             }
 
             return
@@ -113,18 +115,18 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         /// </param>
         /// <param name="model">The <see cref="IEdmModel" /> containing the type</param>
         /// <returns>A <see cref="JObject" /> containing all the properties from entity</returns>
-        private async Task<JObject> ToDocument(EdmComplexObject entity, string tenantId, IEdmComplexType entityType,
+        public async Task<JObject> ToDocument(EdmComplexObject entity, string tenantId, IEdmComplexType entityType,
             ConvertOptions options, IEdmModel model)
         {
             Contract.Requires(model != null);
 
-            var properties =
-                entityType.DeclaredProperties;
+            var properties = GetAllProperties(entityType);
+
 
             if ((options & ConvertOptions.CopyOnlySet) == ConvertOptions.CopyOnlySet)
             {
                 var changedProperties = entity.GetChangedPropertyNames();
-                properties = properties.Where(p => changedProperties.Contains(p.Name));
+                properties = properties.Where(p => changedProperties.Contains(p.Name)).ToList();
             }
 
             return
@@ -251,11 +253,12 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         /// <exception cref="ApplicationException">Thrown if entity has dynamic properties but entityType is not open</exception>
         private static void CopyDynamicProperties(IDelta entity, IEdmStructuredType entityType, JObject result)
         {
+            var allProperties = GetAllProperties(entityType);
             var dynamicProperties =
                 entity.GetChangedPropertyNames()
                     .Where(
                         e =>
-                            !entityType.DeclaredProperties.Any(
+                            !allProperties.Any(
                                 d => d.Name.Equals(e, StringComparison.InvariantCultureIgnoreCase))).ToList();
 
             foreach (var dynamicMemberName in dynamicProperties)
@@ -282,20 +285,21 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         private async Task ComputeProperties(IDelta entity, string tenantId, IEdmStructuredType entityType,
             IEdmModel model, JObject result)
         {
+            var allProperties = GetAllProperties(entityType);
             var tasks =
                 (from key in
-                    entityType.DeclaredProperties.Where(
+                    allProperties.Where(
                         k =>
                             k.VocabularyAnnotations(model)
                                 .Any(v => v.Term.FullName() == CoreVocabularyConstants.Computed))
-                    let key1 = key
-                    select
-                        _valueGenerator.ComputeValue(tenantId, key.Name, key.Type.Definition, entityType)
-                            .ContinueWith(task =>
-                            {
-                                entity.TrySetPropertyValue(key1.Name, task.Result);
-                                result[key1.Name] = JToken.FromObject(task.Result);
-                            })).ToList
+                 let key1 = key
+                 select
+                     _valueGenerator.ComputeValue(tenantId, key.Name, key.Type.Definition, entityType)
+                         .ContinueWith(task =>
+                         {
+                             entity.TrySetPropertyValue(key1.Name, task.Result);
+                             result[key1.Name] = JToken.FromObject(task.Result);
+                         })).ToList
                     ();
             await Task.WhenAll(tasks);
         }
@@ -360,8 +364,9 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         public EdmEntityObject ToEdmEntityObject(JObject entity, string tenantId, IEdmEntityType entityType)
         {
             var result = new EdmEntityObject(entityType);
-            var properties =
-                entityType.DeclaredProperties.Where(
+            var properties = GetAllProperties(entityType);
+
+            properties = properties.Where(
                     p =>
                         (entityType.NavigationProperties() == null || !entityType.NavigationProperties()
                             .Any(
@@ -388,8 +393,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         private EdmComplexObject ToEdmEntityObject(JObject entity, string tenantId, IEdmComplexType entityType)
         {
             var result = new EdmComplexObject(entityType);
-            var properties =
-                entityType.DeclaredProperties.ToList();
+            var properties = GetAllProperties(entityType);
 
             ToEdmEntityObjectInternal(entity, tenantId, entityType, properties, result);
 
@@ -437,13 +441,13 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
 
             if (property.Type.Definition is IEdmComplexType)
             {
-                var obj = ToEdmEntityObject(value as JObject, tenantId, (IEdmComplexType) property.Type.Definition);
+                var obj = ToEdmEntityObject(value as JObject, tenantId, (IEdmComplexType)property.Type.Definition);
                 result.TrySetPropertyValue(property.Name, obj);
             }
             else if (property.Type.Definition is IEdmEnumType)
             {
                 var enumValue = value as JObject;
-                var obj = new EdmEnumObject((IEdmEnumType) property.Type.Definition, enumValue?["Value"].Value<string>());
+                var obj = new EdmEnumObject((IEdmEnumType)property.Type.Definition, enumValue?["Value"].Value<string>());
                 result.TrySetPropertyValue(property.Name, obj);
             }
             else if (property.Type.IsCollection())
@@ -470,11 +474,12 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             TResult result) where TResult : EdmStructuredObject
             where TEntityType : IEdmStructuredType
         {
+            var allProperties = GetAllProperties(entityType);
             var dynamicProperties =
                 entity.Properties()
                     .Where(
                         e =>
-                            !entityType.DeclaredProperties.Any(
+                            !allProperties.Any(
                                 d => d.Name.Equals(e.Name, StringComparison.InvariantCultureIgnoreCase))).ToList();
             foreach (var dynamicMemberName in dynamicProperties)
             {
@@ -507,26 +512,38 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             {
                 var listOfValues =
                     array.Select(
-                        arrayValue => ToEdmEntityObject(arrayValue as JObject, tenantId, elementType as IEdmComplexType))
+                        arrayValue => ToEdmEntityObject(arrayValue as JObject, tenantId, elementType as IEdmComplexType) as IEdmComplexObject)
                         .ToList();
-                result.TrySetPropertyValue(property.Name, listOfValues);
+                var collection =
+                    new EdmComplexObjectCollection(
+                        new EdmCollectionTypeReference(
+                            new EdmCollectionType(new EdmComplexTypeReference(elementType as IEdmComplexType, false))), listOfValues);
+                result.TrySetPropertyValue(property.Name, collection);
             }
             else if (elementType is IEdmEntityType)
             {
                 var listOfValues =
                     array.Select(
-                        arrayValue => ToEdmEntityObject(arrayValue as JObject, tenantId, elementType as IEdmEntityType))
+                        arrayValue => ToEdmEntityObject(arrayValue as JObject, tenantId, elementType as IEdmEntityType) as IEdmEntityObject)
                         .ToList();
-                result.TrySetPropertyValue(property.Name, listOfValues);
+                var collection =
+                    new EdmEntityObjectCollection(
+                        new EdmCollectionTypeReference(
+                            new EdmCollectionType(new EdmEntityTypeReference(elementType as IEdmEntityType, false))), listOfValues);
+                result.TrySetPropertyValue(property.Name, collection);
             }
             else if (elementType is IEdmEnumType)
             {
                 var listOfValues =
                     array.Select(
                         arrayValue =>
-                            new EdmEnumObject(elementType as IEdmEnumType, arrayValue["Value"].Value<string>()))
+                            new EdmEnumObject(elementType as IEdmEnumType, arrayValue["Value"].Value<string>()) as IEdmEnumObject)
                         .ToList();
-                result.TrySetPropertyValue(property.Name, listOfValues);
+                var collection =
+                    new EdmEnumObjectCollection(
+                        new EdmCollectionTypeReference(
+                            new EdmCollectionType(new EdmEnumTypeReference(elementType as IEdmEnumType, false))), listOfValues);
+                result.TrySetPropertyValue(property.Name, collection);
             }
             else
             {
@@ -537,5 +554,25 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         }
 
         #endregion
+
+        /// <summary>
+        /// Get all the properties for a type
+        /// </summary>
+        /// <param name="entityType"><see cref="IEdmStructuredType"/></param>
+        /// <returns>List of <see cref="IEdmProperty"/></returns>
+        private static List<IEdmProperty> GetAllProperties(IEdmStructuredType entityType)
+        {
+            var properties =
+                entityType.DeclaredProperties.ToList();
+
+            var tempType = entityType;
+            while (tempType.BaseType != null)
+            {
+                properties.AddRange(tempType.BaseType.DeclaredProperties);
+                tempType = tempType.BaseType;
+            }
+
+            return properties;
+        } 
     }
 }

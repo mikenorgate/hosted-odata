@@ -84,7 +84,7 @@ namespace OESoftware.Hosted.OData.Api.Core
 
                 if (clrType == typeof(string))
                 {
-                    return null;
+                    return propertyType.IsNullable ? null : string.Empty;
                 }
                 return Activator.CreateInstance(clrType);
             }

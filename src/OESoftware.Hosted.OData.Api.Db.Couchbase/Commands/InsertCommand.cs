@@ -47,16 +47,15 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
         /// <returns><see cref="EdmEntityObject"/></returns>
         public async Task<EdmEntityObject> Execute(string tenantId)
         {
+            //Convert entity to document
+            var converter = new EntityObjectConverter(new ValueGenerator());
+
+            var document =
+                await converter.ToDocument(_entity, tenantId, _entityType, ConvertOptions.ComputeValues, _model);
+
+            var id = await Helpers.CreateEntityId(tenantId, _entity, _entityType);
             using (var bucket = BucketProvider.GetBucket())
             {
-                //Convert entity to document
-                var converter = new EntityObjectConverter(new ValueGenerator());
-
-                var document =
-                    await converter.ToDocument(_entity, tenantId, _entityType, ConvertOptions.ComputeValues, _model);
-
-                var id = await Helpers.CreateEntityId(tenantId, _entity, _entityType);
-
                 var result = await bucket.InsertAsync(id, document);
                 if (!result.Success)
                 {
@@ -67,7 +66,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                 await addToCollection.Execute(tenantId);
 
                 //Convert document back to entity
-                var output = converter.ToEdmEntityObject(result.Value, tenantId, _entityType);
+                var output = converter.ToEdmEntityObject(document, tenantId, _entityType);
 
                 return output;
             }

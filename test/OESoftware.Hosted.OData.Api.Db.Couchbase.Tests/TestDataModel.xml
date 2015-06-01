@@ -122,6 +122,33 @@
         <Property Name="ItemId" Type="Edm.Int32" Nullable="false">
         </Property>
       </EntityType>
+
+      <EntityType Name="BaseType">
+        <Key>
+          <PropertyRef Name="Int32"/>
+        </Key>
+        <Property Name="Int32" Type="Edm.Int32" Nullable="false"></Property>
+      </EntityType>
+
+      <EntityType Name="InheritedType" BaseType="Test.BaseType">
+        <Property Name="Prop1" Type="Edm.String" Nullable="false"></Property>
+      </EntityType>
+
+      <EntityType Name="SubInheritedType" BaseType="Test.InheritedType">
+        <Property Name="Prop2" Type="Edm.String" Nullable="false"></Property>
+      </EntityType>
+
+      <ComplexType Name="ComplexBaseType">
+        <Property Name="Int32" Type="Edm.Int32" Nullable="false"></Property>
+      </ComplexType>
+
+      <ComplexType Name="ComplexInheritedType" BaseType="Test.ComplexBaseType">
+        <Property Name="Prop1" Type="Edm.String" Nullable="false"></Property>
+      </ComplexType>
+
+      <ComplexType Name="ComplexSubInheritedType" BaseType="Test.ComplexInheritedType">
+        <Property Name="Prop2" Type="Edm.String" Nullable="false"></Property>
+      </ComplexType>
     </Schema>
     <Schema Namespace="ODataWebExperimental.Northwind.Model" xmlns="http://docs.oasis-open.org/odata/ns/edm">
       <EntityContainer xmlns:p4="http://schemas.microsoft.com/ado/2009/02/edm/annotation" Name="TestEntities" p4:LazyLoadingEnabled="true">

@@ -77,7 +77,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
 
                         var result = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
                         result.SuccessGet = () => true;
-                        result.ValueGet = () => document1;
+                        result.ValueGet = () => null;
                         return result;
                     });
                 });

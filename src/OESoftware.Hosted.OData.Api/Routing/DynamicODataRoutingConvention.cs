@@ -50,7 +50,7 @@ namespace OESoftware.Hosted.OData.Api.Routing
 
         public string SelectController(ODataPath odataPath, HttpRequestMessage request)
         {
-            return (odataPath.Segments.FirstOrDefault() is ODataPathSegment) ? _controllerName : null;
+            return !(odataPath.Segments.FirstOrDefault() is MetadataPathSegment) ? _controllerName : null;
         }
     }
 }
