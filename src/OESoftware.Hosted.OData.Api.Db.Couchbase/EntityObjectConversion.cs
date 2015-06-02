@@ -474,23 +474,22 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             TResult result) where TResult : EdmStructuredObject
             where TEntityType : IEdmStructuredType
         {
-            var allProperties = GetAllProperties(entityType);
-            var dynamicProperties =
-                entity.Properties()
-                    .Where(
-                        e =>
-                            !allProperties.Any(
-                                d => d.Name.Equals(e.Name, StringComparison.InvariantCultureIgnoreCase))).ToList();
-            foreach (var dynamicMemberName in dynamicProperties)
+            if (entityType.IsOpen)
             {
-                if (!entityType.IsOpen)
+                var allProperties = GetAllProperties(entityType);
+                var dynamicProperties =
+                    entity.Properties()
+                        .Where(
+                            e =>
+                                !allProperties.Any(
+                                    d => d.Name.Equals(e.Name, StringComparison.InvariantCultureIgnoreCase))).ToList();
+                foreach (var dynamicMemberName in dynamicProperties)
                 {
-                    throw new ApplicationException("Dynamic properties not supported on this type");
-                }
-                JToken value;
-                if (entity.TryGetValue(dynamicMemberName.Name, out value))
-                {
-                    result.TrySetPropertyValue(dynamicMemberName.Name, value.Value<string>());
+                    JToken value;
+                    if (entity.TryGetValue(dynamicMemberName.Name, out value))
+                    {
+                        result.TrySetPropertyValue(dynamicMemberName.Name, value.Value<string>());
+                    }
                 }
             }
         }
@@ -573,6 +572,6 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             }
 
             return properties;
-        } 
+        }
     }
 }

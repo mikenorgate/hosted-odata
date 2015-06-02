@@ -41,8 +41,9 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
         /// Execute this command
         /// </summary>
         /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="castType">The <see cref="IEdmEntityType"/> to cast to</param>
         /// <returns><see cref="EdmEntityObjectCollection"/></returns>
-        public async Task<EdmEntityObjectCollection> Execute(string tenantId)
+        public async Task<EdmEntityObjectCollection> Execute(string tenantId, IEdmEntityType castType = null)
         {
             using (var bucket = BucketProvider.GetBucket())
             {
@@ -59,7 +60,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
                 var converter = new EntityObjectConverter(new ValueGenerator());
                 var output =
                     all.Values.Where(e => e.Success)
-                        .Select(e => converter.ToEdmEntityObject(e.Value, tenantId, _entityType) as IEdmEntityObject);
+                        .Select(e => converter.ToEdmEntityObject(e.Value, tenantId, castType ?? _entityType) as IEdmEntityObject);
 
                 return
                     new EdmEntityObjectCollection(

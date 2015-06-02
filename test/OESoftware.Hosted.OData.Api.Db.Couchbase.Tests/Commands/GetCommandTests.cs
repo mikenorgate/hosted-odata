@@ -34,7 +34,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
         }
 
         [TestMethod]
-        public void Execute_Entityxists_ReturnsEntity()
+        public void Execute_EntityExists_ReturnsEntity()
         {
             using (ShimsContext.Create())
             {
@@ -109,6 +109,43 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
             }
         }
 
-      
+        [TestMethod]
+        public void Execute_Cast_ReturnsEntity()
+        {
+            using (ShimsContext.Create())
+            {
+                var type = _model.FindDeclaredType("Test.SubInheritedType") as IEdmEntityType;
+                var castType = _model.FindDeclaredType("Test.BaseType") as IEdmEntityType;
+                var keys = new Dictionary<string, object> { { "Int32", 1 } };
+                var expectedId = Helpers.CreateEntityId("test", keys, type).Result;
+                var document1 = new JObject() { { "Int32", 1 }, { "Prop1", "value1" }, { "Prop2", "value2" } };
+
+                CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
+
+                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                Fakes.ShimBucketProvider.GetBucket = () => bucket;
+                bucket.GetAsyncOf1String((id) =>
+                {
+                    return Task<CouchbaseDb.IOperationResult<JObject>>.Factory.StartNew(() =>
+                    {
+                        Assert.AreEqual(expectedId, id);
+
+                        var result = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
+                        result.SuccessGet = () => true;
+                        result.ValueGet = () => document1;
+                        return result;
+                    });
+                });
+
+                var command = new GetCommand(keys, type);
+                var entity = command.Execute("test", castType).Result;
+
+
+                object value;
+                Assert.IsTrue(entity.TryGetPropertyValue("Int32", out value));
+                Assert.AreEqual(1, value);
+                Assert.AreEqual(1, entity.GetChangedPropertyNames().Count());
+            }
+        }
     }
 }

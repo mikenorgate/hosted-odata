@@ -133,13 +133,21 @@ namespace OESoftware.Hosted.OData.Api
 
         internal const string EntitySetPath = "~/entityset";
 
+        internal const string EntitySetPathWithCast = "~/entityset/cast";
+
         internal const string EntityNavigationPath = "~/entityset/key/navigation";
 
         internal const string EntityPath = "~/entityset/key";
 
+        internal const string EntityPathWithCast = "~/entityset/key/cast";
+
         internal const string EntityPropertyPath = "~/entityset/key/(property(/?))+";
 
+        internal const string EntityPropertyPathWithCast = "~/entityset/key/cast/(property(/?))+";
+
         internal const string EntityRawPropertyPath = "~/entityset/key/(property(/?))+/\\$value";
+
+        internal const string EntityRawPropertyPathWithCast = "~/entityset/key/cast/(property(/?))+/\\$value";
 
         internal const string SingletonPath = "~/singleton";
 

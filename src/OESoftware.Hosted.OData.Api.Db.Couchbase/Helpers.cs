@@ -35,7 +35,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             IEdmEntityType entityType)
         {
             var values = new List<string>();
-            foreach (var property in entityType.DeclaredKey.OrderBy(k => k.Name))
+            var allKeyProperties = GetAllKeys(entityType);
+            foreach (var property in allKeyProperties.OrderBy(k => k.Name))
             {
                 if (
                     !entity.GetChangedPropertyNames()
@@ -67,7 +68,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             IEdmEntityType entityType)
         {
             var values = new List<string>();
-            foreach (var property in entityType.DeclaredKey.OrderBy(k => k.Name))
+            var allKeyProperties = GetAllKeys(entityType);
+            foreach (var property in allKeyProperties.OrderBy(k => k.Name))
             {
                 if (!keys.ContainsKey(property.Name))
                 {
@@ -93,7 +95,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             EdmEntityObject entity, IEdmEntityType entityType)
         {
             var values = new List<string>();
-            foreach (var property in entityType.DeclaredKey.OrderBy(k => k.Name))
+            var allKeyProperties = GetAllKeys(entityType);
+            foreach (var property in allKeyProperties.OrderBy(k => k.Name))
             {
                 if (
                     !entity.GetChangedPropertyNames()
@@ -175,6 +178,32 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                 result.Append(t.ToString("x2"));
 
             return result.ToString();
+        }
+
+        /// <summary>
+        /// Get all the properties for a type
+        /// </summary>
+        /// <param name="entityType"><see cref="IEdmStructuredType"/></param>
+        /// <returns>List of <see cref="IEdmProperty"/></returns>
+        private static List<IEdmStructuralProperty> GetAllKeys(IEdmEntityType entityType)
+        {
+            var properties = new List<IEdmStructuralProperty>();
+            if (entityType.DeclaredKey != null)
+            {
+                properties.AddRange(entityType.DeclaredKey);
+            }
+
+            var tempType = entityType;
+            while (tempType.BaseType != null)
+            {
+                tempType = tempType.BaseType as IEdmEntityType;
+                if (tempType.DeclaredKey != null)
+                {
+                    properties.AddRange(tempType.DeclaredKey);
+                }
+            }
+
+            return properties;
         }
     }
 }

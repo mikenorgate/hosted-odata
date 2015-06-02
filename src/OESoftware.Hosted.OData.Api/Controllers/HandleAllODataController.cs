@@ -47,6 +47,37 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             }
         }
 
+        [ODataPath(EdmConstants.EntityPathWithCast)]
+        public async Task<IHttpActionResult> GetItemWithCast()
+        {
+            var entityType = EntityTypeFromPath();
+            var castType = CastTypeFromPath();
+            if (!entityType.InheritsFrom(castType))
+            {
+                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName(), castType.FullName()));
+            }
+
+            var path = Request.ODataProperties().Path;
+            var keyProperty = path.Segments[1] as KeyValuePathSegment;
+            var keys = keyProperty.ParseKeyValue(entityType);
+
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+            var command = new GetCommand(keys, entityType);
+            try
+            {
+                var result = await command.Execute(dbIdentifier, castType);
+                return Ok(result);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
+        }
+
         [ODataPath(EdmConstants.SingletonPath)]
         public async Task<IHttpActionResult> GetSingleton()
         {
@@ -99,6 +130,39 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             }
         }
 
+        [ODataPath(EdmConstants.EntityPropertyPathWithCast)]
+        [ODataPath(EdmConstants.EntityRawPropertyPathWithCast)]
+        public async Task<IHttpActionResult> GetItemPropertyWithCast()
+        {
+            var entityType = EntityTypeFromPath();
+            var castType = CastTypeFromPath();
+            if (!entityType.InheritsFrom(castType))
+            {
+                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName(), castType.FullName()));
+            }
+            var path = Request.ODataProperties().Path;
+            var keyProperty = path.Segments[1] as KeyValuePathSegment;
+            var keys = keyProperty.ParseKeyValue(entityType);
+
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+            var command = new GetCommand(keys, entityType);
+            try
+            {
+                var result = await command.Execute(dbIdentifier, castType);
+                var value = PropertyFromEntity(path, result);
+
+                return Ok(value);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
+        }
+
         [ODataPath(EdmConstants.SingletonPropertyPath)]
         [ODataPath(EdmConstants.SingletonRawPropertyPath)]
         public async Task<IHttpActionResult> GetSingletonProperty()
@@ -137,6 +201,33 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             try
             {
                 var result = await command.Execute(dbIdentifier);
+                return Ok(result);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
+        }
+
+        [ODataPath(EdmConstants.EntitySetPathWithCast)]
+        public async Task<IHttpActionResult> GetCollectionWithCast()
+        {
+            var entityType = EntityTypeFromPath();
+            var castType = CastTypeFromPath();
+            if (!entityType.InheritsFrom(castType))
+            {
+                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName(), castType.FullName()));
+            }
+
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+            var command = new GetAllCommand(entityType);
+            try
+            {
+                var result = await command.Execute(dbIdentifier, castType);
                 return Ok(result);
             }
             catch (DbException ex)
@@ -432,6 +523,13 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var path = Request.ODataProperties().Path;
             var segment = path.Segments.FirstOrDefault(s => s is SingletonPathSegment) as SingletonPathSegment;
             return segment.Singleton;
+        }
+
+        private IEdmEntityType CastTypeFromPath()
+        {
+            var path = Request.ODataProperties().Path;
+            var segment = path.Segments.FirstOrDefault(s => s is CastPathSegment) as CastPathSegment;
+            return segment.CastType;
         }
 
         protected CreatedODataResult<EdmEntityObject> Created(EdmEntityObject entity, IEdmEntityType entityType)
