@@ -5,10 +5,13 @@
 
 #region usings
 
+using System;
 using System.Threading.Tasks;
 using System.Web.OData;
+using Fasterflect;
 using Microsoft.OData.Edm;
 using Newtonsoft.Json.Linq;
+using OESoftware.Hosted.OData.Api.Core;
 
 #endregion
 
@@ -17,53 +20,38 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
     /// <summary>
     /// Get a singleton
     /// </summary>
-    public class GetSingletonCommand : IDbCommand
+    public class GetSingletonCommand
     {
-        private readonly IEdmSingleton _singleton;
-        private readonly IEdmModel _model;
+        private readonly IValueGenerator _valueGenerator;
 
         /// <summary>
         /// Default Constructor
         /// </summary>
-        /// <param name="singleton"><see cref="IEdmSingleton"/></param>
-        /// <param name="model">The <see cref="IEdmModel"/> containing the type</param>
-        public GetSingletonCommand(IEdmSingleton singleton, IEdmModel model)
+        public GetSingletonCommand(IValueGenerator valueGenerator)
         {
-            _singleton = singleton;
-            _model = model;
-        }
-
-        Task IDbCommand.Execute(string tenantId)
-        {
-            return Execute(tenantId);
+            _valueGenerator = valueGenerator;
         }
 
         /// <summary>
         /// Execute this command
         /// </summary>
         /// <param name="tenantId">The id of the tenant</param>
-        /// <returns><see cref="EdmEntityObject"/></returns>
-        public async Task<EdmEntityObject> Execute(string tenantId)
+        /// <param name="singletonType">The type of the singleton</param>
+        /// <returns><see cref="IDynamicEntity"/></returns>
+        public async Task<IDynamicEntity> Execute(string tenantId, Type singletonType)
         {
-            using (var bucket = BucketProvider.GetBucket())
+            var bucket = BucketProvider.GetBucket();
+            //Convert entity to document
+            var id = Helpers.CreateSingletonId(tenantId, singletonType.FullName);
+
+            var result = await CommandHelpers.GetDocumentAsync(bucket, singletonType, id);
+            if (!result.Success)
             {
-                //Convert entity to document
-                var id = Helpers.CreateSingletonId(tenantId, _singleton);
-                var converter = new EntityObjectConverter(new ValueGenerator());
-                var result = await bucket.GetDocumentAsync<JObject>(id);
-                if (!result.Success)
-                {
-                    return await CommandHelpers.InsertSingletonAsync(converter, new EdmEntityObject(_singleton.EntityType()), tenantId, _singleton, _model, id, bucket);
-                }
-                else
-                {
-
-                    //Convert document back to entity
-                    var output = converter.ToEdmEntityObject(result.Content, tenantId, _singleton.EntityType());
-
-                    return output;
-                }
+                return
+                    await CommandHelpers.InsertSingletonAsync(bucket, singletonType, id, tenantId, _valueGenerator);
             }
+
+            return CommandHelpers.ReflectionGetContent<IDynamicEntity>(result);
         }
     }
 }

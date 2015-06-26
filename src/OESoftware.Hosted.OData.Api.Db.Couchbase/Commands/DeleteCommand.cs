@@ -5,6 +5,7 @@
 
 #region usings
 
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.OData.Edm;
@@ -16,42 +17,28 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
     /// <summary>
     /// Delete an entity by key
     /// </summary>
-    public class DeleteCommand : IDbCommand
+    public class DeleteCommand
     {
-        private readonly IEdmEntityType _entityType;
-        private readonly IDictionary<string, object> _keys;
-
-        /// <summary>
-        /// Default constructor
-        /// </summary>
-        /// <param name="keys">A dictionary of the keys for the entity</param>
-        /// <param name="entityType">The <see cref="IEdmEntityType"/> of the collection</param>
-        public DeleteCommand(IDictionary<string, object> keys, IEdmEntityType entityType)
-        {
-            _keys = keys;
-            _entityType = entityType;
-        }
-
         /// <summary>
         /// Execute this command
         /// </summary>
         /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="keys">A dictionary of the keys for the entity</param>
+        /// <param name="entityType">The type of the collection</param>
         /// <returns>void</returns>
-        public async Task Execute(string tenantId)
+        public async Task Execute(string tenantId, IDictionary<string, object> keys, Type entityType)
         {
-            using (var bucket = BucketProvider.GetBucket())
+            var bucket = BucketProvider.GetBucket();
+            var id = await Helpers.CreateEntityId(tenantId, keys, entityType.FullName);
+
+            var result = await bucket.RemoveAsync(id);
+            if (!result.Success)
             {
-                var id = await Helpers.CreateEntityId(tenantId, _keys, _entityType);
-
-                var result = await bucket.RemoveAsync(id);
-                if (!result.Success)
-                {
-                    throw ExceptionCreator.CreateDbException(result);
-                }
-
-                var removeFromCollection = new RemoveFromCollectionCommand(id, _entityType);
-                await removeFromCollection.Execute(tenantId);
+                throw ExceptionCreator.CreateDbException(result);
             }
+
+            var removeFromCollection = new RemoveFromCollectionCommand();
+            await removeFromCollection.Execute(tenantId, id, entityType);
         }
     }
 }

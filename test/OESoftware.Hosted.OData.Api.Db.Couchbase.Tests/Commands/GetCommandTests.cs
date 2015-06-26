@@ -10,6 +10,7 @@ using Microsoft.OData.Edm.Validation;
 using Microsoft.QualityTools.Testing.Fakes;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json.Linq;
+using OESoftware.Hosted.OData.Api.Core;
 using OESoftware.Hosted.OData.Api.Db.Couchbase.Commands;
 using CouchbaseDb = Couchbase;
 
@@ -18,87 +19,49 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
     [TestClass]
     public class GetCommandTests
     {
-        IEdmModel _model;
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            using (var stringReader = new FileStream("TestDataModel.xml", FileMode.Open))
-            {
-                using (var xmlReader = XmlReader.Create(stringReader))
-                {
-                    IEnumerable<EdmError> errors;
-                    EdmxReader.TryParse(xmlReader, out _model, out errors);
-                }
-            }
-        }
-
         [TestMethod]
         public void Execute_EntityExists_ReturnsEntity()
         {
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.SimpleWithKey") as IEdmEntityType;
+                var type = typeof(TestEntity);
                 var keys = new Dictionary<string, object> { { "Int32", 1 } };
-                var expectedId = Helpers.CreateEntityId("test", keys, type).Result;
-                var document1 = new JObject() { { "Int32", 1 }, { "Prop1", "value1" }, { "Prop2", "value2" } };
+                var expectedId = Helpers.CreateEntityId("test", keys, type.FullName).Result;
+                var document1 = new TestEntity() { Int32 = 1, Prop1 = "value1", Prop2 = "value2" };
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetAsyncOf1String((id) =>
-                {
-                    return Task<CouchbaseDb.IOperationResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(expectedId, id);
 
-                        var result = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
-                        result.SuccessGet = () => true;
-                        result.ValueGet = () => document1;
-                        return result;
-                    });
-                });
+                bucket.Items.Add(expectedId, document1);
+                bucket.Cas.Add(expectedId, 1);
 
-                var command = new GetCommand(keys, type);
-                var entity = command.Execute("test").Result;
+                var command = new GetCommand();
+                var entity = (TestEntity)command.Execute("test", keys, type).Result;
 
-                
-                object value;
-                Assert.IsTrue(entity.TryGetPropertyValue("Int32", out value));
-                Assert.AreEqual(1, value);
+                Assert.AreEqual(document1, entity);
             }
         }
 
         [TestMethod]
-        public void Execute_CollectionDoesNotExists_ThrowsDbException()
+        public void Execute_EntityDoesNotExists_ThrowsDbException()
         {
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.SimpleWithKey") as IEdmEntityType;
+                var type = typeof(TestEntity);
                 var keys = new Dictionary<string, object> { { "Int32", 1 } };
-                var expectedId = Helpers.CreateEntityId("test", keys, type).Result;
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetAsyncOf1String((id) =>
-                {
-                    return Task<CouchbaseDb.IOperationResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(expectedId, id);
-
-                        var result = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
-                        result.SuccessGet = () => false;
-                        return result;
-                    });
-                });
 
                 try
                 {
-                    var command = new GetCommand(keys, type);
-                    var collection = command.Execute("test").Result;
+                    var command = new GetCommand();
+                    var entity = command.Execute("test", keys, type).Result;
+                    Assert.Fail();
                 }
                 catch (AggregateException exception)
                 {
@@ -114,37 +77,26 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
         {
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.SubInheritedType") as IEdmEntityType;
-                var castType = _model.FindDeclaredType("Test.BaseType") as IEdmEntityType;
+                var type = typeof(SubTestEntity);
+                var castType = typeof(TestEntity);
                 var keys = new Dictionary<string, object> { { "Int32", 1 } };
-                var expectedId = Helpers.CreateEntityId("test", keys, type).Result;
-                var document1 = new JObject() { { "Int32", 1 }, { "Prop1", "value1" }, { "Prop2", "value2" } };
+                var expectedId = Helpers.CreateEntityId("test", keys, type.FullName).Result;
+                var document1 = new SubTestEntity() { Int32 = 1, Prop1 = "value1", Prop2 = "value2" };
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetAsyncOf1String((id) =>
-                {
-                    return Task<CouchbaseDb.IOperationResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(expectedId, id);
 
-                        var result = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
-                        result.SuccessGet = () => true;
-                        result.ValueGet = () => document1;
-                        return result;
-                    });
-                });
+                bucket.Items.Add(expectedId, document1);
+                bucket.Cas.Add(expectedId, 1);
 
-                var command = new GetCommand(keys, type);
-                var entity = command.Execute("test", castType).Result;
+                var command = new GetCommand();
+                var entity = command.Execute("test", keys, type, castType).Result;
 
+                Assert.IsInstanceOfType(entity, castType);
 
-                object value;
-                Assert.IsTrue(entity.TryGetPropertyValue("Int32", out value));
-                Assert.AreEqual(1, value);
-                Assert.AreEqual(1, entity.GetChangedPropertyNames().Count());
+                Assert.AreEqual(document1, entity);
             }
         }
     }

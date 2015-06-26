@@ -80,17 +80,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             ConvertOptions options, IEdmModel model)
         {
             Contract.Requires(model != null);
-            var properties = GetAllProperties(entityType);
-
-            properties = properties.Where(
-                    p =>
-                        (entityType.NavigationProperties() == null || !entityType.NavigationProperties()
-                            .Any(
-                                n =>
-                                    n.ReferentialConstraint.PropertyPairs.Any(
-                                        r =>
-                                            r.DependentProperty.Name.Equals(p.Name,
-                                                StringComparison.InvariantCultureIgnoreCase))))).ToList();
+            var allProperties = GetAllProperties(entityType);
+            var properties = allProperties.Where(p => p.PropertyKind != EdmPropertyKind.Navigation);
 
             if ((options & ConvertOptions.CopyOnlySet) == ConvertOptions.CopyOnlySet)
             {
@@ -98,10 +89,14 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                 properties = properties.Where(p => changedProperties.Contains(p.Name)).ToList();
             }
 
-            return
+
+
+            var document =
                 await
                     ToDocumentInternal(entity, tenantId, entityType, properties.Cast<IEdmStructuralProperty>().ToList(),
                         options, model);
+
+            return document;
         }
 
         /// <summary>
@@ -364,17 +359,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         public EdmEntityObject ToEdmEntityObject(JObject entity, string tenantId, IEdmEntityType entityType)
         {
             var result = new EdmEntityObject(entityType);
-            var properties = GetAllProperties(entityType);
+            var properties = GetAllProperties(entityType).Where(p => p.PropertyKind != EdmPropertyKind.Navigation);
 
-            properties = properties.Where(
-                    p =>
-                        (entityType.NavigationProperties() == null || !entityType.NavigationProperties()
-                            .Any(
-                                n =>
-                                    n.ReferentialConstraint.PropertyPairs.Any(
-                                        r =>
-                                            r.DependentProperty.Name.Equals(p.Name,
-                                                StringComparison.InvariantCultureIgnoreCase))))).ToList();
 
             ToEdmEntityObjectInternal(entity, tenantId, entityType, properties, result);
 

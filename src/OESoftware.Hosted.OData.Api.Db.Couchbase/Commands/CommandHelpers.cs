@@ -5,12 +5,16 @@
 
 #region usings
 
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Web.OData;
 using Couchbase;
 using Couchbase.Core;
+using Fasterflect;
 using Microsoft.OData.Edm;
 using Newtonsoft.Json.Linq;
+using OESoftware.Hosted.OData.Api.Core;
 
 #endregion
 
@@ -19,39 +23,112 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
     /// <summary>
     /// Helpers for commands
     /// </summary>
-    internal static class CommandHelpers
+    public static class CommandHelpers
     {
         /// <summary>
         /// Insert a singleton
         /// </summary>
-        /// <param name="converter"><see cref="EntityObjectConverter"/></param>
-        /// <param name="entity"><see cref="EdmEntityObject"/></param>
-        /// <param name="tenantId">The id of the tenant</param>
-        /// <param name="singleton"><see cref="IEdmSingleton"/></param>
-        /// <param name="model"><see cref="IEdmModel"/></param>
-        /// <param name="id">ID of the singleton</param>
         /// <param name="bucket"><see cref="IBucket"/></param>
-        /// <returns><see cref="EdmEntityObject"/></returns>
-        internal static async Task<EdmEntityObject> InsertSingletonAsync(EntityObjectConverter converter,
-            EdmEntityObject entity, string tenantId, IEdmSingleton singleton, IEdmModel model, string id, IBucket bucket)
+        /// <param name="singletonType">The type of the singleton</param>
+        /// <param name="singletonId">ID of the singleton</param>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="valueGenerator"><see cref="IValueGenerator"/></param>
+        /// <returns><see cref="IDynamicEntity"/></returns>
+        public static async Task<IDynamicEntity> InsertSingletonAsync(IBucket bucket, Type singletonType, string singletonId, string tenantId, IValueGenerator valueGenerator, Delta delta = null, bool isPut = false)
         {
-            var document =
-                await
-                    converter.ToDocument(entity, tenantId, singleton.EntityType(), ConvertOptions.ComputeValues, model);
-            var insertDoc = new Document<JObject>
-            {
-                Id = id,
-                Content = document
-            };
-            var result = await bucket.InsertAsync(insertDoc);
-            if (!result.Success)
-            {
-                throw ExceptionCreator.CreateDbException(result);
-            }
-            //Convert document back to entity
-            var output = converter.ToEdmEntityObject(document, tenantId, singleton.EntityType());
+            var singleton = (IDynamicEntity)singletonType.CreateInstance();
+            await valueGenerator.ComputeValues(tenantId, singleton);
 
-            return output;
+            if (delta != null)
+            {
+                delta.CallMethod(isPut ? "Put" : "Patch", singleton);
+            }
+
+            var insertResult =
+                await
+                    InsertDocumentAsync(bucket, singletonType, singletonId, singleton);
+            if (!insertResult.Success)
+            {
+                throw ExceptionCreator.CreateDbException(insertResult);
+            }
+
+            return singleton;
+        }
+
+        /// <summary>
+        /// Get a document from the bucket
+        /// </summary>
+        /// <param name="bucket"><see cref="IBucket"/></param>
+        /// <param name="type">The type of the entity</param>
+        /// <param name="id">The id of the document</param>
+        /// <returns></returns>
+        public static async Task<IDocumentResult> GetDocumentAsync(IBucket bucket, Type type, string id, Type castType = null)
+        {
+            var task = ((Task)bucket.CallMethod(new Type[] { castType ?? type }, "GetDocumentAsync", id));
+            await task;
+
+            var find = (IDocumentResult)task.GetPropertyValue("Result");
+            return find;
+        }
+
+        public static async Task<IOperationResult> ReplaceDocumentAsync(IBucket bucket, Type type, string id,
+            object entity, ulong cas)
+        {
+            var task = ((Task)bucket.CallMethod(new Type[] { type }, "ReplaceAsync", id, entity, cas));
+            await task;
+
+            var result = (IOperationResult)task.GetPropertyValue("Result");
+            return result;
+        }
+
+        public static async Task<IOperationResult> InsertDocumentAsync(IBucket bucket, Type type, string id,
+            object entity)
+        {
+            var task = ((Task)bucket.CallMethod(new Type[] { type }, "InsertAsync", id, entity));
+            await task;
+
+            var result = (IOperationResult)task.GetPropertyValue("Result");
+            return result;
+        }
+
+        public static async Task<IOperationResult> RemoveDocumentAsync(IBucket bucket, string id, ulong cas)
+        {
+            return await bucket.RemoveAsync(id, cas);
+        }
+
+        public static IEnumerable<IDynamicEntity> GetAll(IBucket bucket, IEnumerable<string> ids, Type type, Type castType = null)
+        {
+            var task = bucket.CallMethod(new Type[] { castType ?? type }, "Get", ids);
+
+            dynamic all = task.GetPropertyValue("Values");
+
+            var list = new List<IDynamicEntity>();
+
+            foreach (IOperationResult operationResult in all)
+            {
+                if (operationResult.Success)
+                {
+                    list.Add(operationResult.GetPropertyValue("Value") as IDynamicEntity);
+                }
+            }
+
+            return list;
+        }
+
+        public static object ReflectionGetDocument(IDocumentResult documentResult)
+        {
+            return documentResult.GetPropertyValue("Document");
+        }
+
+        public static T ReflectionGetContent<T>(IDocumentResult documentResult)
+        {
+            return (T)documentResult.GetPropertyValue("Content");
+        }
+
+        public static ulong ReflectionGetCas(IDocumentResult documentResult)
+        {
+            var document = ReflectionGetDocument(documentResult);
+            return (ulong)document.GetPropertyValue("Cas");
         }
     }
 }

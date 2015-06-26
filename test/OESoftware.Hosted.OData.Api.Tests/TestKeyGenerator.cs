@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.OData.Edm;
+using OESoftware.Hosted.OData.Api.Core;
 using OESoftware.Hosted.OData.Api.Db;
 using OESoftware.Hosted.OData.Api.Models;
 
@@ -59,6 +60,16 @@ namespace OESoftware.Hosted.OData.Api.Tests
 
                 return value;
             });
+        }
+
+        public Task<object> ComputeValue(string tenantId, string propertyName, Type propertyType, string entityType)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task ComputeValues(string tenantId, IDynamicEntity entity)
+        {
+            throw new NotImplementedException();
         }
 
         private async Task<Int16> CreateInt16Key(string dbIdentifier, string keyName)

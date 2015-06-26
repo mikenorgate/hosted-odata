@@ -5,6 +5,8 @@
 
 #region usings
 
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Couchbase;
 using Couchbase.Core;
 
@@ -18,6 +20,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
     public static class BucketProvider
     {
         private static readonly Cluster Cluster = new Cluster("couchbaseClients/couchbase");
+        private static readonly IDictionary<string, IBucket> Buckets = new ConcurrentDictionary<string, IBucket>(); 
+
 
         /// <summary>
         ///     Get the default bucket
@@ -27,7 +31,13 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         /// </returns>
         public static IBucket GetBucket()
         {
-            return Cluster.OpenBucket();
+            IBucket bucket;
+            if (!Buckets.TryGetValue("default", out bucket))
+            {
+                bucket = Cluster.OpenBucket();
+                Buckets.Add("default", bucket);
+            }
+            return bucket;
         }
 
         /// <summary>
@@ -39,7 +49,13 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         /// </returns>
         public static IBucket GetBucket(string name)
         {
-            return Cluster.OpenBucket(name);
+            IBucket bucket;
+            if (!Buckets.TryGetValue(name.ToLower(), out bucket))
+            {
+                bucket = Cluster.OpenBucket(name);
+                Buckets.Add(name.ToLower(), bucket);
+            }
+            return bucket;
         }
     }
 }

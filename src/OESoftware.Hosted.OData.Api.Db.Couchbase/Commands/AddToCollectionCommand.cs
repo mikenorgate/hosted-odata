@@ -5,6 +5,7 @@
 
 #region usings
 
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Couchbase;
@@ -19,63 +20,49 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
     /// <summary>
     /// Add an entity key to a collection
     /// </summary>
-    public class AddToCollectionCommand : IDbCommand
+    public class AddToCollectionCommand
     {
-        private readonly IEdmEntityType _entityType;
-        private readonly string _key;
-
-        /// <summary>
-        /// Default Constructor
-        /// </summary>
-        /// <param name="key">The key to add to the collection</param>
-        /// <param name="entityType">The <see cref="IEdmEntityType"/> of the collection</param>
-        public AddToCollectionCommand(string key, IEdmEntityType entityType)
-        {
-            _key = key;
-            _entityType = entityType;
-        }
-
         /// <summary>
         /// Execute this command
         /// </summary>
         /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="key">The key of the item to add to the collection</param>
+        /// <param name="entityType">The type of the entity</param>
         /// <returns>void</returns>
-        public async Task Execute(string tenantId)
+        public async Task Execute(string tenantId, string key, Type entityType)
         {
-            using (var bucket = BucketProvider.GetBucket())
+            var bucket = BucketProvider.GetBucket();
+            var id = Helpers.CreateCollectionId(tenantId, entityType.FullName);
+            var existing = await bucket.GetDocumentAsync<string[]>(id);
+            if (!existing.Success)
             {
-                var id = Helpers.CreateCollectionId(tenantId, _entityType);
-                var existing = await bucket.GetDocumentAsync<JArray>(id);
-                if (!existing.Success)
+                var insertReuslt = await bucket.InsertAsync(id, new string[] { key });
+                if (!insertReuslt.Success && insertReuslt.Status == ResponseStatus.KeyExists)
                 {
-                    var insertReuslt = await bucket.InsertAsync(new Document<JArray>
-                    {
-                        Id = id,
-                        Content = new JArray(_key)
-                    });
-                    if (!insertReuslt.Success && insertReuslt.Status == ResponseStatus.KeyExists)
-                    {
-                        //If the insert failed with key exists then another thread got there first
-                        //Try again
-                        await Execute(tenantId);
-                    }
+                    //If the insert failed with key exists then another thread got there first
+                    //Try again
+                    await Execute(tenantId, key, entityType);
                 }
-                else
+            }
+            else
+            {
+                var match = existing.Content.FirstOrDefault(j => j.Equals(key));
+                if (match != null)
                 {
-                    var match = existing.Content.FirstOrDefault(j => j.Value<string>().Equals(_key));
-                    if (match != null)
-                    {
-                        //Id is already in collection, nothing to do;
-                        return;
-                    }
-                    existing.Document.Content.Add(_key);
-                    var updateResult = await bucket.ReplaceAsync(existing.Document);
-                    if (!updateResult.Success)
-                    {
-                        //If the update failed then another thread got there first
-                        //Try again
-                        await Execute(tenantId);
-                    }
+                    //Id is already in collection, nothing to do;
+                    return;
+                }
+
+                var updated = existing.Document.Content;
+                Array.Resize(ref updated, updated.Length + 1);
+                updated[updated.Length - 1] = key;
+
+                var updateResult = await bucket.ReplaceAsync(id, updated, existing.Document.Cas);
+                if (!updateResult.Success)
+                {
+                    //If the update failed then another thread got there first
+                    //Try again
+                    await Execute(tenantId, key, entityType);
                 }
             }
         }

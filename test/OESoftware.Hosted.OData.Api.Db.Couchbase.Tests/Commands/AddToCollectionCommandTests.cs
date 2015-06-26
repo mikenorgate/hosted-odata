@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
 using Couchbase.IO;
@@ -18,316 +19,145 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
     [TestClass]
     public class AddToCollectionCommandTests
     {
-        IEdmModel _model;
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            using (var stringReader = new FileStream("TestDataModel.xml", FileMode.Open))
-            {
-                using (var xmlReader = XmlReader.Create(stringReader))
-                {
-                    IEnumerable<EdmError> errors;
-                    EdmxReader.TryParse(xmlReader, out _model, out errors);
-                }
-            }
-        }
 
         [TestMethod]
         public void Execute_CreatesNewCollectionAndAddsId_InsertsId()
         {
-            var insertCalled = false;
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.AllTypes") as IEdmEntityType;
+                var type = typeof(TestEntity);
                 var entityKey = "test-key";
-                var expectedId = Helpers.CreateCollectionId("test", type);
+                var expectedId = Helpers.CreateCollectionId("test", type.FullName);
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetDocumentAsyncOf1String((id) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(expectedId, id);
 
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                        result.SuccessGet = () => false;
-                        return result;
-                    });
-                });
+                var command = new AddToCollectionCommand();
+                command.Execute("test", entityKey, type).Wait();
 
-                bucket.InsertAsyncOf1IDocumentOfM0<JArray>((document) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        insertCalled = true;
-
-                        Assert.AreEqual(expectedId, document.Id);
-
-                        Assert.AreEqual(entityKey, document.Content[0]);
-
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                        result.SuccessGet = () => true;
-                        return result;
-                    });
-                });
-
-                var command = new AddToCollectionCommand(entityKey, type);
-                command.Execute("test").Wait();
-
-                if (!insertCalled)
-                {
-                    Assert.Fail();
-                }
+                var collection = (string[])bucket.Items[expectedId];
+                Assert.AreEqual(1, collection.Length);
+                Assert.IsTrue(collection.Contains(entityKey));
             }
         }
 
         [TestMethod]
         public void Execute_AppendsCollectionAndAddsId_AppendsId()
         {
-            var replaceCalled = false;
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.AllTypes") as IEdmEntityType;
+                var type = typeof(TestEntity);
                 var entityKey = "test-key";
-                var existingArray = new JArray("id-1", "id-2");
-                var expectedId = Helpers.CreateCollectionId("test", type);
+                var existingArray = new string[] { "id-1", "id-2" };
+                var expectedId = Helpers.CreateCollectionId("test", type.FullName);
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetDocumentAsyncOf1String((id) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(expectedId, id);
 
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                        var document = new CouchbaseDb.Fakes.StubDocument<JArray>();
-                        document.Content = existingArray;
-                        document.Id = id;
-                        result.SuccessGet = () => true;
-                        result.ContentGet = () => document.Content;
-                        result.DocumentGet = () => document;
-                        return result;
-                    });
-                });
+                bucket.Items.Add(expectedId, existingArray);
+                bucket.Cas.Add(expectedId, 1);
 
-                bucket.ReplaceAsyncOf1IDocumentOfM0<JArray>((document) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        replaceCalled = true;
+                var command = new AddToCollectionCommand();
+                command.Execute("test", entityKey, type).Wait();
 
-                        Assert.AreEqual(expectedId, document.Id);
-
-                        Assert.AreEqual(3, document.Content.Count);
-                        Assert.AreEqual(entityKey, document.Content[2]);
-
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                        result.SuccessGet = () => true;
-                        return result;
-                    });
-                });
-
-                var command = new AddToCollectionCommand(entityKey, type);
-                command.Execute("test").Wait();
-
-                if (!replaceCalled)
-                {
-                    Assert.Fail();
-                }
+                var collection = (string[])bucket.Items[expectedId];
+                Assert.AreEqual(3, collection.Length);
+                Assert.IsTrue(collection.Contains(entityKey));
             }
         }
 
         [TestMethod]
         public void Execute_IdAlreadyInArrary_DoesNothing()
         {
-            var replaceCalled = false;
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.AllTypes") as IEdmEntityType;
+                var type = typeof(TestEntity);
                 var entityKey = "test-key";
-                var existingArray = new JArray("id-1", "id-2", "test-key");
-                var expectedId = Helpers.CreateCollectionId("test", type);
+                var existingArray = new string[] { "id-1", "id-2", "test-key" };
+                var expectedId = Helpers.CreateCollectionId("test", type.FullName);
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetDocumentAsyncOf1String((id) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(expectedId, id);
 
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                        var document = new CouchbaseDb.Fakes.StubDocument<JArray>();
-                        document.Content = existingArray;
-                        document.Id = id;
-                        result.SuccessGet = () => true;
-                        result.ContentGet = () => document.Content;
-                        result.DocumentGet = () => document;
-                        return result;
-                    });
-                });
+                bucket.Items.Add(expectedId, existingArray);
+                bucket.Cas.Add(expectedId, 1);
 
-                bucket.ReplaceAsyncOf1IDocumentOfM0<JArray>((document) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        replaceCalled = true;
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                        result.SuccessGet = () => true;
-                        return result;
-                    });
-                });
+                var command = new AddToCollectionCommand();
+                command.Execute("test", entityKey, type).Wait();
 
-                var command = new AddToCollectionCommand(entityKey, type);
-                command.Execute("test").Wait();
-
-                Assert.IsFalse(replaceCalled);
+                var collection = (string[])bucket.Items[expectedId];
+                Assert.AreEqual(3, collection.Length);
+                Assert.IsTrue(collection.Contains(entityKey));
             }
         }
 
         [TestMethod]
         public void Execute_InsertFailsDueToExistingKey_Retrys()
         {
-            var insertCalled = false;
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.AllTypes") as IEdmEntityType;
+                var type = typeof(TestEntity);
                 var entityKey = "test-key";
-                var expectedId = Helpers.CreateCollectionId("test", type);
+                var expectedId = Helpers.CreateCollectionId("test", type.FullName);
                 var called = 0;
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetDocumentAsyncOf1String((id) =>
+
+                bucket.InsertBefore = (s, o) =>
                 {
-                    return Task<CouchbaseDb.IDocumentResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(expectedId, id);
+                    called++;
+                    return called < 2;
+                };
 
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                        result.SuccessGet = () => false;
-                        return result;
-                    });
-                });
+                var command = new AddToCollectionCommand();
+                command.Execute("test", entityKey, type).Wait();
 
-                bucket.InsertAsyncOf1IDocumentOfM0<JArray>((document) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        called++;
-                        if (called < 2)
-                        {
-                            var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                            result.SuccessGet = () => false;
-                            result.StatusGet = () => ResponseStatus.KeyExists;
-                            return result;
-                        }
-                        else
-                        {
-                            insertCalled = true;
-
-                            Assert.AreEqual(expectedId, document.Id);
-
-                            Assert.AreEqual(entityKey, document.Content[0]);
-
-                            var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                            result.SuccessGet = () => true;
-                            return result;
-                        }
-                    });
-                });
-
-                var command = new AddToCollectionCommand(entityKey, type);
-                command.Execute("test").Wait();
-
-                if (!insertCalled)
-                {
-                    Assert.Fail();
-                }
+                var collection = (string[])bucket.Items[expectedId];
+                Assert.AreEqual(1, collection.Length);
+                Assert.IsTrue(collection.Contains(entityKey));
             }
         }
 
         [TestMethod]
         public void Execute_ReplaceFailsDueToExistingKey_Retrys()
         {
-            var replaceCalled = false;
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.AllTypes") as IEdmEntityType;
+                var type = typeof(TestEntity);
                 var entityKey = "test-key";
-                var expectedId = Helpers.CreateCollectionId("test", type);
-                var called = 0;
-                var existingArray = new JArray("id-1", "id-2");
+                var existingArray = new string[] { "id-1", "id-2" };
+                var expectedId = Helpers.CreateCollectionId("test", type.FullName);
+                var count = 0;
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetDocumentAsyncOf1String((id) =>
+
+                bucket.Items.Add(expectedId, existingArray);
+                bucket.Cas.Add(expectedId, 1);
+
+                bucket.ReplaceBefore = (s, o, arg3) =>
                 {
-                    return Task<CouchbaseDb.IDocumentResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(expectedId, id);
+                    count++;
+                    return count < 2;
+                };
 
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                        var document = new CouchbaseDb.Fakes.StubDocument<JArray>();
-                        document.Content = existingArray;
-                        document.Id = id;
-                        result.SuccessGet = () => true;
-                        result.ContentGet = () => document.Content;
-                        result.DocumentGet = () => document;
-                        return result;
-                    });
-                    
-                });
+                var command = new AddToCollectionCommand();
+                command.Execute("test", entityKey, type).Wait();
 
-                bucket.ReplaceAsyncOf1IDocumentOfM0<JArray>((document) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        called++;
-                        if (called < 2)
-                        {
-                            existingArray.Remove(existingArray[2]);
-                            var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                            result.SuccessGet = () => false;
-                            result.StatusGet = () => ResponseStatus.KeyExists;
-                            return result;
-                        }
-                        else
-                        {
-                            replaceCalled = true;
-
-                            Assert.AreEqual(expectedId, document.Id);
-
-                            Assert.AreEqual(3, document.Content.Count);
-                            Assert.AreEqual(entityKey, document.Content[2]);
-
-                            var result = new CouchbaseDb.Fakes.StubIDocumentResult<JArray>();
-                            result.SuccessGet = () => true;
-                            return result;
-                        }
-                    });
-                });
-
-                var command = new AddToCollectionCommand(entityKey, type);
-                command.Execute("test").Wait();
-
-                if (!replaceCalled)
-                {
-                    Assert.Fail();
-                }
+                var collection = (string[])bucket.Items[expectedId];
+                Assert.AreEqual(3, collection.Length);
+                Assert.IsTrue(collection.Contains(entityKey));
             }
         }
     }

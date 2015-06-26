@@ -26,26 +26,23 @@ namespace OESoftware.Hosted.OData.Api.Middleware
                 Guid keyAsId;
                 if (Guid.TryParse(apiKey, out keyAsId))
                 {
-                    using (var bucket = BucketProvider.GetBucket("Internal"))
+                    var bucket = BucketProvider.GetBucket("Internal");
+                    var id = bucket.Get<string>(string.Format("Application:Key:{0}", keyAsId));
+                    if (!id.Success)
                     {
-                        var id = bucket.Get<string>(string.Format("Application:Key:{0}", keyAsId));
-                        if (!id.Success)
-                        {
-                            context.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                            return;
-                        }
-                        var application = bucket.Get<Application>(id.Value);
-                        if (!application.Success)
-                        {
-                            context.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                            return;
-                        }
-
-                        context.Set("DbId", application.Value.DbIdentifier.ToString());
-                        context.Set("apiKey", keyAsId.ToString());
-                        context.Set("apiKey.type", keyAsId == application.Value.PrivateApiKey ? "private" : "public");
+                        context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                        return;
                     }
-                    
+                    var application = bucket.Get<Application>(id.Value);
+                    if (!application.Success)
+                    {
+                        context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                        return;
+                    }
+
+                    context.Set("DbId", application.Value.DbIdentifier.ToString());
+                    context.Set("apiKey", keyAsId.ToString());
+                    context.Set("apiKey.type", keyAsId == application.Value.PrivateApiKey ? "private" : "public");
                 }
             }
 

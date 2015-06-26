@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -8,17 +10,23 @@ using System.Web.Http;
 using System.Web.Http.Results;
 using System.Web.OData;
 using System.Web.OData.Extensions;
+using System.Web.OData.Formatter;
 using System.Web.OData.Query;
 using System.Web.OData.Results;
 using System.Web.OData.Routing;
+using Fasterflect;
 using Microsoft.OData.Edm;
 using OESoftware.Hosted.OData.Api.Attributes;
+using OESoftware.Hosted.OData.Api.Core;
 using OESoftware.Hosted.OData.Api.Db;
+using OESoftware.Hosted.OData.Api.Db.Couchbase;
 using OESoftware.Hosted.OData.Api.Db.Couchbase.Commands;
 using OESoftware.Hosted.OData.Api.Extensions;
+using OESoftware.Hosted.OData.Api.TypeMapping;
 
 namespace OESoftware.Hosted.OData.Api.Controllers
 {
+    [DynamicEntityMapping]
     public class HandleAllODataController : ODataController
     {
         [ODataPath(EdmConstants.EntityPath)]
@@ -26,16 +34,17 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         {
             var entityType = EntityTypeFromPath();
 
+            var model = Request.ODataProperties().Model;
             var path = Request.ODataProperties().Path;
             var keyProperty = path.Segments[1] as KeyValuePathSegment;
             var keys = keyProperty.ParseKeyValue(entityType);
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new GetCommand(keys, entityType);
+            var command = new GetCommand();
             try
             {
-                var result = await command.Execute(dbIdentifier);
-                return Ok(result);
+                var result = await command.Execute(dbIdentifier, keys, EdmLibHelpers.GetClrType(path.EdmType, model));
+                return DynamicOk(result);
             }
             catch (DbException ex)
             {
@@ -50,23 +59,24 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         [ODataPath(EdmConstants.EntityPathWithCast)]
         public async Task<IHttpActionResult> GetItemWithCast()
         {
-            var entityType = EntityTypeFromPath();
-            var castType = CastTypeFromPath();
-            if (!entityType.InheritsFrom(castType))
+            var model = Request.ODataProperties().Model;
+            var entityType = EdmLibHelpers.GetClrType(EntityTypeFromPath(), model);
+            var castType = EdmLibHelpers.GetClrType(CastTypeFromPath(), model);
+            if (!entityType.Inherits(castType))
             {
-                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName(), castType.FullName()));
+                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName, castType.FullName));
             }
 
             var path = Request.ODataProperties().Path;
             var keyProperty = path.Segments[1] as KeyValuePathSegment;
-            var keys = keyProperty.ParseKeyValue(entityType);
+            var keys = keyProperty.ParseKeyValue(EntityTypeFromPath());
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new GetCommand(keys, entityType);
+            var command = new GetCommand();
             try
             {
-                var result = await command.Execute(dbIdentifier, castType);
-                return Ok(result);
+                var result = await command.Execute(dbIdentifier, keys, entityType, castType);
+                return DynamicOk(result);
             }
             catch (DbException ex)
             {
@@ -85,11 +95,11 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var model = Request.ODataProperties().Model;
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new GetSingletonCommand(entityType, model);
+            var command = new GetSingletonCommand(new ValueGenerator());
             try
             {
-                var result = await command.Execute(dbIdentifier);
-                return Ok(result);
+                var result = await command.Execute(dbIdentifier, EdmLibHelpers.GetClrType(entityType.Type, model));
+                return DynamicOk(result);
             }
             catch (DbException ex)
             {
@@ -106,16 +116,17 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         public async Task<IHttpActionResult> GetItemProperty()
         {
             var entityType = EntityTypeFromPath();
+            var model = Request.ODataProperties().Model;
 
             var path = Request.ODataProperties().Path;
             var keyProperty = path.Segments[1] as KeyValuePathSegment;
             var keys = keyProperty.ParseKeyValue(entityType);
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new GetCommand(keys, entityType);
+            var command = new GetCommand();
             try
             {
-                var result = await command.Execute(dbIdentifier);
+                var result = await command.Execute(dbIdentifier, keys, EdmLibHelpers.GetClrType(entityType, model));
                 var value = PropertyFromEntity(path, result);
 
                 return Ok(value);
@@ -134,21 +145,23 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         [ODataPath(EdmConstants.EntityRawPropertyPathWithCast)]
         public async Task<IHttpActionResult> GetItemPropertyWithCast()
         {
-            var entityType = EntityTypeFromPath();
-            var castType = CastTypeFromPath();
-            if (!entityType.InheritsFrom(castType))
+            var model = Request.ODataProperties().Model;
+            var entityType = EdmLibHelpers.GetClrType(EntityTypeFromPath(), model);
+            var castType = EdmLibHelpers.GetClrType(CastTypeFromPath(), model);
+            if (!entityType.Inherits(castType))
             {
-                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName(), castType.FullName()));
+                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName, castType.FullName));
             }
+
             var path = Request.ODataProperties().Path;
             var keyProperty = path.Segments[1] as KeyValuePathSegment;
-            var keys = keyProperty.ParseKeyValue(entityType);
+            var keys = keyProperty.ParseKeyValue(EntityTypeFromPath());
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new GetCommand(keys, entityType);
+            var command = new GetCommand();
             try
             {
-                var result = await command.Execute(dbIdentifier, castType);
+                var result = await command.Execute(dbIdentifier, keys, entityType, castType);
                 var value = PropertyFromEntity(path, result);
 
                 return Ok(value);
@@ -173,10 +186,10 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var model = Request.ODataProperties().Model;
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new GetSingletonCommand(entityType, model);
+            var command = new GetSingletonCommand(new ValueGenerator());
             try
             {
-                var result = await command.Execute(dbIdentifier);
+                var result = await command.Execute(dbIdentifier, EdmLibHelpers.GetClrType(entityType.Type, model));
                 var value = PropertyFromEntity(path, result);
 
                 return Ok(value);
@@ -194,14 +207,15 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         [ODataPath(EdmConstants.EntitySetPath)]
         public async Task<IHttpActionResult> GetCollection()
         {
-            var entityType = EntityTypeFromPath();
+            var model = Request.ODataProperties().Model;
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new GetAllCommand(entityType);
+            var command = new GetAllCommand();
             try
             {
-                var result = await command.Execute(dbIdentifier);
-                return Ok(result);
+                var entityType = EdmLibHelpers.GetClrType(TypeFromPath(), model);
+                var result = await command.Execute(dbIdentifier, entityType);
+                return DynamicOk(result, entityType);
             }
             catch (DbException ex)
             {
@@ -216,19 +230,20 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         [ODataPath(EdmConstants.EntitySetPathWithCast)]
         public async Task<IHttpActionResult> GetCollectionWithCast()
         {
-            var entityType = EntityTypeFromPath();
-            var castType = CastTypeFromPath();
-            if (!entityType.InheritsFrom(castType))
+            var model = Request.ODataProperties().Model;
+            var entityType = EdmLibHelpers.GetClrType(EntityTypeFromPath(), model);
+            var castType = EdmLibHelpers.GetClrType(CastTypeFromPath(), model);
+            if (!entityType.Inherits(castType))
             {
-                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName(), castType.FullName()));
+                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName, castType.FullName));
             }
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
-            var command = new GetAllCommand(entityType);
+            var command = new GetAllCommand();
             try
             {
-                var result = await command.Execute(dbIdentifier, castType);
-                return Ok(result);
+                var result = await command.Execute(dbIdentifier, entityType, castType);
+                return DynamicOk(result, castType);
             }
             catch (DbException ex)
             {
@@ -241,7 +256,7 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         }
 
         [ODataPath(EdmConstants.EntitySetPath)]
-        public async Task<IHttpActionResult> PostCollection(EdmEntityObject entity)
+        public async Task<IHttpActionResult> PostCollection(IDynamicEntity entity)
         {
             if (!ModelState.IsValid)
             {
@@ -250,15 +265,12 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
 
-            var entityType = EntityTypeFromPath();
-            var model = Request.ODataProperties().Model;
-
-            var command = new InsertCommand(entity, entityType, model);
+            var command = new InsertCommand(new ValueGenerator());
             try
             {
-                var output = await command.Execute(dbIdentifier);
+                var output = await command.Execute(dbIdentifier, entity);
 
-                return Created(output, entityType);
+                return DynamicCreated(output);
             }
             catch (DbException ex)
             {
@@ -271,7 +283,7 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         }
 
         [ODataPath(EdmConstants.EntityPath)]
-        public async Task<IHttpActionResult> PatchItem(EdmEntityObject entity)
+        public async Task<IHttpActionResult> PatchItem(Delta entity)
         {
             if (!ModelState.IsValid)
             {
@@ -287,12 +299,12 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
 
             var model = Request.ODataProperties().Model;
-            var command = new UpdateCommand(keys, entity, entityType, model);
+            var command = new UpdateCommand();
             try
             {
-                var result = await command.Execute(dbIdentifier);
+                var result = await command.Execute(dbIdentifier, keys, EdmLibHelpers.GetClrType(entityType, model), entity, false);
 
-                return Updated(result);
+                return DynamicUpdated(result);
             }
             catch (DbException ex)
             {
@@ -305,7 +317,7 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         }
 
         [ODataPath(EdmConstants.SingletonPath)]
-        public async Task<IHttpActionResult> PatchSingleton(EdmEntityObject entity)
+        public async Task<IHttpActionResult> PatchSingleton(Delta entity)
         {
             if (!ModelState.IsValid)
             {
@@ -317,12 +329,12 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
 
             var model = Request.ODataProperties().Model;
-            var command = new UpdateSingletonCommand(entity, entityType, model);
+            var command = new UpdateSingletonCommand(new ValueGenerator());
             try
             {
-                var result = await command.Execute(dbIdentifier);
+                var result = await command.Execute(dbIdentifier, EdmLibHelpers.GetClrType(entityType.Type, model), entity, false);
 
-                return Ok(result);
+                return DynamicOk(result);
             }
             catch (DbException ex)
             {
@@ -335,7 +347,7 @@ namespace OESoftware.Hosted.OData.Api.Controllers
         }
 
         [ODataPath(EdmConstants.EntityPath)]
-        public async Task<IHttpActionResult> PutItem(EdmEntityObject entity)
+        public async Task<IHttpActionResult> PutItem(Delta entity)
         {
             if (!ModelState.IsValid)
             {
@@ -351,12 +363,12 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
 
             var model = Request.ODataProperties().Model;
-            var command = new ReplaceCommand(keys, entity, entityType, model);
+            var command = new UpdateCommand();
             try
             {
-                var result = await command.Execute(dbIdentifier);
+                var result = await command.Execute(dbIdentifier, keys, EdmLibHelpers.GetClrType(entityType, model), entity, true);
 
-                return Updated(result);
+                return DynamicUpdated(result);
             }
             catch (DbException ex)
             {
@@ -381,12 +393,12 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
 
             var model = Request.ODataProperties().Model;
-            var command = new ReplaceSingletonCommand(entity, entityType, model);
+            var command = new UpdateSingletonCommand(new ValueGenerator());
             try
             {
-                var result = await command.Execute(dbIdentifier);
+                var result = await command.Execute(dbIdentifier, EdmLibHelpers.GetClrType(entityType.Type, model), entity, false);
 
-                return Ok(result);
+                return DynamicOk(result);
             }
             catch (DbException ex)
             {
@@ -465,6 +477,7 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             }
 
             var entityType = EntityTypeFromPath();
+            var model = Request.ODataProperties().Model;
 
             var path = Request.ODataProperties().Path;
             var keyProperty = path.Segments[1] as KeyValuePathSegment;
@@ -474,8 +487,8 @@ namespace OESoftware.Hosted.OData.Api.Controllers
 
             try
             {
-                var command = new DeleteCommand(keys, entityType);
-                await command.Execute(dbIdentifier);
+                var command = new DeleteCommand();
+                await command.Execute(dbIdentifier, keys, EdmLibHelpers.GetClrType(entityType, model));
 
                 return new StatusCodeResult(HttpStatusCode.NoContent, this);
             }
@@ -507,13 +520,30 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 var type = segment.GetEdmType(null);
                 if (type is IEdmCollectionType)
                 {
-                    var collectionType = (IEdmCollectionType) type;
-                    entityType = (IEdmEntityType) collectionType.ElementType.Definition;
+                    var collectionType = (IEdmCollectionType)type;
+                    entityType = (IEdmEntityType)collectionType.ElementType.Definition;
                 }
                 else
                 {
-                    entityType = (IEdmEntityType) type;
+                    entityType = (IEdmEntityType)type;
                 }
+            }
+            return entityType;
+        }
+
+        private IEdmType TypeFromPath()
+        {
+            var path = Request.ODataProperties().Path;
+            IEdmType entityType = null;
+            var type = path.EdmType;
+            if (type is IEdmCollectionType)
+            {
+                var collectionType = (IEdmCollectionType)type;
+                entityType = collectionType.ElementType.Definition;
+            }
+            else
+            {
+                entityType = type;
             }
             return entityType;
         }
@@ -530,6 +560,40 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var path = Request.ODataProperties().Path;
             var segment = path.Segments.FirstOrDefault(s => s is CastPathSegment) as CastPathSegment;
             return segment.CastType;
+        }
+
+
+        private IHttpActionResult DynamicCreated(IDynamicEntity entity)
+        {
+            var result = this.CallMethod(new Type[] { entity.GetType() }, "Created", entity);
+            return (IHttpActionResult)result;
+        }
+
+        private IHttpActionResult DynamicOk(IDynamicEntity entity)
+        {
+            var result = this.CallMethod(new Type[] { entity.GetType() }, "Ok", entity);
+            return (IHttpActionResult)result;
+        }
+
+        private IHttpActionResult DynamicOk(IEnumerable<IDynamicEntity> entity, Type entityType)
+        {
+            var enumberableType = typeof(List<>);
+            var resultType = enumberableType.MakeGenericType(entityType);
+
+            var outputList = resultType.CreateInstance();
+            foreach (var dynamicEntity in entity)
+            {
+                outputList.CallMethod("Add", dynamicEntity);
+            }
+
+            var result = this.CallMethod(new Type[] { resultType }, "Ok", outputList);
+            return (IHttpActionResult)result;
+        }
+
+        private IHttpActionResult DynamicUpdated(IDynamicEntity entity)
+        {
+            var result = this.CallMethod(new Type[] { entity.GetType() }, "Updated", entity);
+            return (IHttpActionResult)result;
         }
 
         protected CreatedODataResult<EdmEntityObject> Created(EdmEntityObject entity, IEdmEntityType entityType)
@@ -584,6 +648,23 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 if (propertyValue.TryGetPropertyValue(propertySegement.PropertyName, out value) && value is IEdmStructuredObject)
                 {
                     propertyValue = (IEdmStructuredObject)value;
+                }
+            }
+            return value;
+        }
+
+        private static dynamic PropertyFromEntity(ODataPath path, IDynamicEntity result)
+        {
+            var propertySegements =
+                path.Segments.Where(s => s is PropertyAccessPathSegment).Cast<PropertyAccessPathSegment>().ToList();
+            object propertyValue = result;
+            object value = null;
+            foreach (var propertySegement in propertySegements)
+            {
+                value = propertyValue.TryGetPropertyValue(propertySegement.PropertyName);
+                if (!value.GetType().IsPrimitive)
+                {
+                    propertyValue = value;
                 }
             }
             return value;

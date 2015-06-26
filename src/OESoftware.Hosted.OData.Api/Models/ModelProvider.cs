@@ -17,6 +17,7 @@ using Microsoft.OData.Edm.Validation;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using OESoftware.Hosted.OData.Api.Db.Couchbase;
+using OESoftware.Hosted.OData.Api.DynamicAssembyGeneration;
 using OESoftware.Hosted.OData.Api.Interfaces;
 
 namespace OESoftware.Hosted.OData.Api.Models
@@ -47,22 +48,22 @@ namespace OESoftware.Hosted.OData.Api.Models
                 return cached;
             }
 
-            using (var bucket = BucketProvider.GetBucket("Internal"))
+            var bucket = BucketProvider.GetBucket("Internal");
+            var schema = bucket.Get<string>(string.Format("Application:Schema:{0}", dbIdentifier));
+            if (!schema.Success)
             {
-                var schema = bucket.Get<string>(string.Format("Application:Schema:{0}", dbIdentifier));
-                if (!schema.Success)
-                {
-                    return new EdmModel();
-                }
+                return new EdmModel();
+            }
 
-                using (var stringReader = new StringReader(schema.Value))
+            using (var stringReader = new StringReader(schema.Value))
+            {
+                using (var xmlReader = XmlReader.Create(stringReader))
                 {
-                    using (var xmlReader = XmlReader.Create(stringReader))
-                    {
-                        var model = EdmxReader.Parse(xmlReader);
-                        ModelCache.Add(dbIdentifier, model, new CacheItemPolicy());
-                        return model;
-                    }
+                    var model = EdmxReader.Parse(xmlReader);
+                    ModelCache.Add(dbIdentifier, model, new CacheItemPolicy());
+                    var a = new DynamicAssembyGenerator();
+                    a.Create(model);
+                    return model;
                 }
             }
         }
@@ -87,25 +88,25 @@ namespace OESoftware.Hosted.OData.Api.Models
                 return false;
             }
 
-            using (var bucket = BucketProvider.GetBucket("Internal"))
+            var bucket = BucketProvider.GetBucket("Internal");
+            var id = string.Format("Application:Schema:{0}", dbIdentifier);
+            var schema = bucket.GetDocument<string>(id);
+            if (!schema.Success)
             {
-                var id = string.Format("Application:Schema:{0}", dbIdentifier);
-                var schema = bucket.GetDocument<string>(id);
-                if (!schema.Success)
+                bucket.Insert(id, xmlBuilder.ToString());
+            }
+            else
+            {
+                schema.Document.Content = xmlBuilder.ToString();
+                var replace = bucket.Replace(schema.Document);
+                ModelCache.Remove(dbIdentifier);
+                if (!replace.Success)
                 {
-                    bucket.Insert(id, xmlBuilder.ToString());
-                }
-                else
-                {
-                    schema.Document.Content = xmlBuilder.ToString();
-                    var replace = bucket.Replace(schema.Document);
-                    ModelCache.Remove(dbIdentifier);
-                    if (!replace.Success)
-                    {
-                        return false;
-                    }
+                    return false;
                 }
             }
+            var a = new DynamicAssembyGenerator();
+            a.Create(model);
             return true;
         }
 

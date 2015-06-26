@@ -22,28 +22,26 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 return BadRequest(ModelState);
             }
 
-            using (var bucket = BucketProvider.GetBucket("Internal"))
+            var bucket = BucketProvider.GetBucket("Internal");
+            var id = string.Format("Application:{0}", model.ApplicationName);
+            var app = new Application()
             {
-                var id = string.Format("Application:{0}", model.ApplicationName);
-                var app = new Application()
-                {
-                    AdminEmailAddress = model.AdminEmailAddress,
-                    ApplicationName = model.ApplicationName,
-                    PrivateApiKey = Guid.NewGuid(),
-                    PublicApiKey = Guid.NewGuid(),
-                    DbIdentifier = Guid.NewGuid()
-                };
-                var insertResult = bucket.Insert(id, app);
-                if (!insertResult.Success)
-                {
-                    return BadRequest("An application with this name already exists");
-                }
-                bucket.Insert(string.Format("Application:Key:{0}", app.PrivateApiKey), id);
-                bucket.Insert(string.Format("Application:Key:{0}", app.PublicApiKey), id);
-                bucket.Insert(string.Format("Application:Key:{0}", app.DbIdentifier), id);
-
-                return Ok(app);
+                AdminEmailAddress = model.AdminEmailAddress,
+                ApplicationName = model.ApplicationName,
+                PrivateApiKey = Guid.NewGuid(),
+                PublicApiKey = Guid.NewGuid(),
+                DbIdentifier = Guid.NewGuid()
+            };
+            var insertResult = bucket.Insert(id, app);
+            if (!insertResult.Success)
+            {
+                return BadRequest("An application with this name already exists");
             }
+            bucket.Insert(string.Format("Application:Key:{0}", app.PrivateApiKey), id);
+            bucket.Insert(string.Format("Application:Key:{0}", app.PublicApiKey), id);
+            bucket.Insert(string.Format("Application:Key:{0}", app.DbIdentifier), id);
+
+            return Ok(app);
         }
     }
 }

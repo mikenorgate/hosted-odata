@@ -13,7 +13,9 @@ using Microsoft.OData.Edm.Validation;
 using Microsoft.QualityTools.Testing.Fakes;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json.Linq;
+using OESoftware.Hosted.OData.Api.Core;
 using OESoftware.Hosted.OData.Api.Db.Couchbase.Commands;
+using OESoftware.Hosted.OData.Api.Tests.Core;
 using CouchbaseDb = Couchbase;
 
 namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
@@ -22,93 +24,63 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
     [TestClass]
     public class UpdateSingletonCommandTests
     {
-        IEdmModel _model;
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            using (var stringReader = new FileStream("TestDataModel.xml", FileMode.Open))
-            {
-                using (var xmlReader = XmlReader.Create(stringReader))
-                {
-                    IEnumerable<EdmError> errors;
-                    EdmxReader.TryParse(xmlReader, out _model, out errors);
-                }
-            }
-        }
-
         [TestMethod]
         public void Execute_AlreadyExists_ReplacesDbEntry()
         {
             using (ShimsContext.Create())
             {
-                var replaceCalled = false;
-                var type = _model.FindDeclaredSingleton("TestEntities.Singleton");
-                var expectedId = Helpers.CreateSingletonId("test", type);
-                var document1 = new JObject() { { "ItemId", 1 } };
-                var document2 = new JObject() { { "ItemId", 2 } };
-                var entity = new EdmEntityObject(new EdmEntityType("Test", "Singleton"));
+                var type = typeof(TestEntity);
+                var expectedId = Helpers.CreateSingletonId("test", type.FullName);
+                var document1 = new TestEntity() { Int32 = 1, Prop1 = "value1", Prop2 = "value2" };
+                var delta = new Delta<TestEntity>();
+                delta.TrySetPropertyValue("Prop1", "value2");
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                Fakes.ShimEntityObjectConverter.AllInstances
-                    .ToDocumentEdmEntityObjectStringIEdmEntityTypeConvertOptionsIEdmModel =
-                    (converter, o, arg3, arg4, arg5, arg6) =>
-                    {
-                        return Task<JObject>.Factory.StartNew(() =>
-                        {
-                            Assert.AreEqual(ConvertOptions.CopyOnlySet, arg5);
-
-                            return document2;
-                        });
-                    };
-
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
+                bucket.Items.Add(expectedId, document1);
+                bucket.Cas.Add(expectedId, 1L);
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
 
-                bucket.GetDocumentAsyncOf1String<JObject>((id) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JObject>();
-                        result.SuccessGet = () => true;
-                        result.DocumentGet = () => new StubDocument<JObject>()
-                        {
-                            Content = document1,
-                            Id = id
-                        };
-                        result.ContentGet = () => document1;
-                        return result;
-                    });
-                });
+                var command = new UpdateSingletonCommand(new TestValueGenerator());
+                var output = command.Execute("test", type, delta, false).Result;
 
-                bucket.ReplaceAsyncOf1IDocumentOfM0<JObject>((doc) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        replaceCalled = true;
+                var content = (TestEntity)bucket.Items[expectedId];
+                Assert.AreEqual(1, content.Int32);
+                Assert.AreEqual("value2", content.Prop1);
+                Assert.AreEqual("value2", content.Prop2);
 
-                        Assert.AreEqual(expectedId, doc.Id);
-                        Assert.AreEqual(document2.ToString(), doc.Content.ToString());
+                Assert.AreEqual(content, output);
+            }
+        }
 
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JObject>();
-                        result.SuccessGet = () => true;
-                        result.DocumentGet = () => new StubDocument<JObject>()
-                        {
-                            Content = document2
-                        };
-                        return result;
-                    });
-                });
+        [TestMethod]
+        public void Execute_AlreadyExistsPut_ReplacesDbEntry()
+        {
+            using (ShimsContext.Create())
+            {
+                var type = typeof(TestEntity);
+                var expectedId = Helpers.CreateSingletonId("test", type.FullName);
+                var document1 = new TestEntity() { Int32 = 1, Prop1 = "value1", Prop2 = "value2" };
+                var delta = new Delta<TestEntity>();
+                delta.TrySetPropertyValue("Prop1", "value2");
 
-                var command = new UpdateSingletonCommand(entity, type, _model);
-                var output = command.Execute("test").Result;
+                CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                object value;
-                Assert.IsTrue(output.TryGetPropertyValue("ItemId", out value));
-                Assert.AreEqual(2, value);
+                var bucket = new TestBucket();
+                bucket.Items.Add(expectedId, document1);
+                bucket.Cas.Add(expectedId, 1L);
+                Fakes.ShimBucketProvider.GetBucket = () => bucket;
 
-                Assert.IsTrue(replaceCalled);
+                var command = new UpdateSingletonCommand(new TestValueGenerator());
+                var output = command.Execute("test", type, delta, true).Result;
+
+                var content = (TestEntity)bucket.Items[expectedId];
+                Assert.AreEqual(0, content.Int32);
+                Assert.AreEqual("value2", content.Prop1);
+                Assert.AreEqual(null, content.Prop2);
+
+                Assert.AreEqual(content, output);
             }
         }
 
@@ -117,62 +89,29 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
         {
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredSingleton("TestEntities.Singleton");
-                var expectedId = Helpers.CreateSingletonId("test", type);
-                var document1 = new JObject() { { "ItemId", 1 } };
-                var document2 = new JObject() { { "ItemId", 2 } };
-                var entity = new EdmEntityObject(new EdmEntityType("Test", "Singleton"));
+                var type = typeof(TestEntity);
+                var expectedId = Helpers.CreateSingletonId("test", type.FullName);
+                var document1 = new TestEntity() { Int32 = 1, Prop1 = "value1", Prop2 = "value2" };
+                var delta = new Delta<TestEntity>();
+                delta.TrySetPropertyValue("Prop1", "value2");
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                Fakes.ShimEntityObjectConverter.AllInstances
-                    .ToDocumentEdmEntityObjectStringIEdmEntityTypeConvertOptionsIEdmModel =
-                    (converter, o, arg3, arg4, arg5, arg6) =>
-                    {
-                        return Task<JObject>.Factory.StartNew(() =>
-                        {
-                            Assert.AreEqual(ConvertOptions.CopyOnlySet, arg5);
-
-                            return document2;
-                        });
-                    };
-
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
+                bucket.Items.Add(expectedId, document1);
+                bucket.Cas.Add(expectedId, 1L);
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
 
-                bucket.GetDocumentAsyncOf1String<JObject>((id) =>
+                bucket.ReplaceBefore = (s, o, arg3) =>
                 {
-                    return Task<CouchbaseDb.IDocumentResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JObject>();
-                        result.SuccessGet = () => true;
-                        result.DocumentGet = () => new StubDocument<JObject>()
-                        {
-                            Content = document1,
-                            Id = id
-                        };
-                        result.ContentGet = () => document1;
-                        return result;
-                    });
-                });
-
-                bucket.ReplaceAsyncOf1IDocumentOfM0<JObject>((doc) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(expectedId, doc.Id);
-                        Assert.AreEqual(document1.ToString(), doc.Content.ToString());
-
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JObject>();
-                        result.SuccessGet = () => false;
-                        return result;
-                    });
-                });
+                    return false;
+                };
 
                 try
                 {
-                    var command = new UpdateSingletonCommand(entity, type, _model);
-                    var output = command.Execute("test").Result;
+                    var command = new UpdateSingletonCommand(new TestValueGenerator());
+                    var output = command.Execute("test", type, delta, false).Result;
+                    Assert.Fail();
                 }
                 catch (AggregateException exception)
                 {
@@ -189,62 +128,26 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
             using (ShimsContext.Create())
             {
                 var insertCalled = false;
-                var type = _model.FindDeclaredSingleton("TestEntities.Singleton");
-                var expectedId = Helpers.CreateSingletonId("test", type);
-                var document1 = new JObject() { { "ItemId", 1 } };
-                var document2 = new JObject() { { "ItemId", 2 } };
-                var entity = new EdmEntityObject(new EdmEntityType("Test", "Singleton"));
+                var type = typeof(TestEntity);
+                var expectedId = Helpers.CreateSingletonId("test", type.FullName);
+                var delta = new Delta<TestEntity>();
+                delta.TrySetPropertyValue("Prop1", "value2");
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                Fakes.ShimEntityObjectConverter.AllInstances
-                    .ToDocumentEdmEntityObjectStringIEdmEntityTypeConvertOptionsIEdmModel =
-                    (converter, o, arg3, arg4, arg5, arg6) =>
-                    {
-                        return Task<JObject>.Factory.StartNew(() =>
-                        {
-                            Assert.AreEqual(ConvertOptions.ComputeValues, arg5);
-
-                            return document2;
-                        });
-                    };
-
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
 
-                bucket.GetDocumentAsyncOf1String<JObject>((id) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JObject>();
-                        result.SuccessGet = () => false;
-                        return result;
-                    });
-                });
+                var command = new UpdateSingletonCommand(new TestValueGenerator());
+                var output = (TestEntity)command.Execute("test", type, delta, false).Result;
 
-                bucket.InsertAsyncOf1IDocumentOfM0<JObject>((doc) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        insertCalled = true;
+                var inserted = bucket.Items[expectedId];
+                Assert.AreEqual(inserted, output);
 
-                        Assert.AreEqual(expectedId, doc.Id);
-                        Assert.AreEqual(document2, doc.Content);
+                Assert.AreEqual(0, output.Int32);
+                Assert.AreEqual("value2", output.Prop1);
+                Assert.AreEqual(null, output.Prop2);
 
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JObject>();
-                        result.SuccessGet = () => true;
-                        return result;
-                    });
-                });
-                
-                var command = new UpdateSingletonCommand(entity, type, _model);
-                var output = command.Execute("test").Result;
-
-                object value;
-                Assert.IsTrue(output.TryGetPropertyValue("ItemId", out value));
-                Assert.AreEqual(2, value);
-                
-                Assert.IsTrue(insertCalled);
             }
         }
 
@@ -253,59 +156,25 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
         {
             using (ShimsContext.Create())
             {
-                var insertCalled = false;
-                var type = _model.FindDeclaredSingleton("TestEntities.Singleton");
-                var expectedId = Helpers.CreateSingletonId("test", type);
-                var document1 = new JObject() { { "ItemId", 1 } };
-                var document2 = new JObject() { { "ItemId", 2 } };
-                var entity = new EdmEntityObject(new EdmEntityType("Test", "Singleton"));
+                var type = typeof(TestEntity);
+                var delta = new Delta<TestEntity>();
+                delta.TrySetPropertyValue("Prop1", "value2");
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                Fakes.ShimEntityObjectConverter.AllInstances
-                    .ToDocumentEdmEntityObjectStringIEdmEntityTypeConvertOptionsIEdmModel =
-                    (converter, o, arg3, arg4, arg5, arg6) =>
-                    {
-                        return Task<JObject>.Factory.StartNew(() =>
-                        {
-                            Assert.AreEqual(ConvertOptions.ComputeValues, arg5);
-
-                            return document2;
-                        });
-                    };
-
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
 
-                bucket.GetDocumentAsyncOf1String<JObject>((id) =>
+                bucket.InsertBefore = (s, o) =>
                 {
-                    return Task<CouchbaseDb.IDocumentResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JObject>();
-                        result.SuccessGet = () => false;
-                        return result;
-                    });
-                });
-
-                bucket.InsertAsyncOf1IDocumentOfM0<JObject>((doc) =>
-                {
-                    return Task<CouchbaseDb.IDocumentResult<JObject>>.Factory.StartNew(() =>
-                    {
-                        insertCalled = true;
-
-                        Assert.AreEqual(expectedId, doc.Id);
-                        Assert.AreEqual(document2, doc.Content);
-
-                        var result = new CouchbaseDb.Fakes.StubIDocumentResult<JObject>();
-                        result.SuccessGet = () => false;
-                        return result;
-                    });
-                });
+                    return false;
+                };
 
                 try
                 {
-                    var command = new UpdateSingletonCommand(entity, type, _model);
-                    var output = command.Execute("test").Result;
+                    var command = new UpdateSingletonCommand(new TestValueGenerator());
+                    var output = command.Execute("test", type, delta, false).Result;
+                    Assert.Fail();
                 }
                 catch (AggregateException exception)
                 {
@@ -313,10 +182,8 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
                     var firstException = exception.InnerExceptions.First();
                     Assert.IsInstanceOfType(firstException, typeof(DbException));
                 }
-                
-                Assert.IsTrue(insertCalled);
             }
         }
-        
+
     }
 }

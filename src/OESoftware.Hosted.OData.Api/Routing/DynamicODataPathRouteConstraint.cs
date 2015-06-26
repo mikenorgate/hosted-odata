@@ -14,6 +14,7 @@ using Microsoft.OData.Edm;
 using Microsoft.OData.Edm.Library;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using OESoftware.Hosted.OData.Api.DynamicAssembyGeneration;
 using OESoftware.Hosted.OData.Api.Extensions;
 using OESoftware.Hosted.OData.Api.Interfaces;
 
@@ -74,6 +75,7 @@ namespace OESoftware.Hosted.OData.Api.Routing
                 request.Properties[DynamicODataPath] = oDataPathString;
 
                 model = EdmModelProvider.FromRequest(request).Result;
+
                 oDataPathString = (string)request.Properties[DynamicODataPath];
 
                 var requestLeftPart = request.RequestUri.GetLeftPart(UriPartial.Path);

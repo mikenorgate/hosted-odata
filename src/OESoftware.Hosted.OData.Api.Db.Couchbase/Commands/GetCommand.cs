@@ -5,11 +5,16 @@
 
 #region usings
 
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Web.OData;
+using Couchbase;
+using Couchbase.Core;
+using Fasterflect;
 using Microsoft.OData.Edm;
 using Newtonsoft.Json.Linq;
+using OESoftware.Hosted.OData.Api.Core;
 
 #endregion
 
@@ -18,52 +23,30 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
     /// <summary>
     /// Get a single element by key
     /// </summary>
-    public class GetCommand : IDbCommand
+    public class GetCommand
     {
-        private readonly IEdmEntityType _entityType;
-        private readonly IDictionary<string, object> _keys;
-
-        /// <summary>
-        /// Default Constructor
-        /// </summary>
-        /// <param name="keys">A dictionary of the keys for the entity</param>
-        /// <param name="entityType">The <see cref="IEdmEntityType"/> of the collection</param>
-        public GetCommand(IDictionary<string, object> keys, IEdmEntityType entityType)
-        {
-            _keys = keys;
-            _entityType = entityType;
-        }
-
-        Task IDbCommand.Execute(string tenantId)
-        {
-            return Execute(tenantId);
-        }
-
         /// <summary>
         /// Execute this command
         /// </summary>
         /// <param name="tenantId">The id of the tenant</param>
-        /// <param name="castType">The <see cref="IEdmEntityType"/> to cast to</param>
-        /// <returns><see cref="EdmEntityObject"/></returns>
-        public async Task<EdmEntityObject> Execute(string tenantId, IEdmEntityType castType = null)
+        /// <param name="keys">Keys to of entity to get</param>
+        /// <param name="entityType">Type of entity</param>
+        /// <param name="castType">The type to cast to</param>
+        /// <returns><see cref="IDynamicEntity"/></returns>
+        public async Task<IDynamicEntity> Execute(string tenantId, IDictionary<string, object> keys, Type entityType, Type castType = null)
         {
-            using (var bucket = BucketProvider.GetBucket())
+            var bucket = BucketProvider.GetBucket();
+            //Convert entity to document
+            var id = await Helpers.CreateEntityId(tenantId, keys, entityType.FullName);
+
+            var result = await CommandHelpers.GetDocumentAsync(bucket, entityType, id, castType);
+
+            if (!result.Success)
             {
-                //Convert entity to document
-                var id = await Helpers.CreateEntityId(tenantId, _keys, _entityType);
-
-                var result = await bucket.GetAsync<JObject>(id);
-                if (!result.Success)
-                {
-                    throw ExceptionCreator.CreateDbException(result);
-                }
-
-                var converter = new EntityObjectConverter(new ValueGenerator());
-                //Convert document back to entity
-                var output = converter.ToEdmEntityObject(result.Value, tenantId, castType ?? _entityType);
-
-                return output;
+                throw ExceptionCreator.CreateDbException(result);
             }
+
+            return CommandHelpers.ReflectionGetContent<IDynamicEntity>(result);
         }
     }
 }

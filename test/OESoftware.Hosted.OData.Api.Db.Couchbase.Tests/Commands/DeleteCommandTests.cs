@@ -18,113 +18,65 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
     [TestClass]
     public class DeleteCommandTests
     {
-        IEdmModel _model;
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            using (var stringReader = new FileStream("TestDataModel.xml", FileMode.Open))
-            {
-                using (var xmlReader = XmlReader.Create(stringReader))
-                {
-                    IEnumerable<EdmError> errors;
-                    EdmxReader.TryParse(xmlReader, out _model, out errors);
-                }
-            }
-        }
-
         [TestMethod]
         public void Execute_EntityExists_RemovesItemAndRemovesFromCollection()
         {
-            var deleteCalled = false;
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.SimpleWithKey") as IEdmEntityType;
-                var keys = new Dictionary<string, object> {{ "Int32", 123}};
-                var expectedId = Helpers.CreateEntityId("test", keys, type).Result;
+                var type = typeof(TestEntity);
+                var collectionId = Helpers.CreateCollectionId("test", type.FullName);
+
+                var keys = new Dictionary<string, object> { { "Int32", 1 } };
+                var expectedId = Helpers.CreateEntityId("test", keys, type.FullName).Result;
+                var document1 = new SubTestEntity() { Int32 = 1, Prop1 = "value1", Prop2 = "value2" };
+
+                var keys2 = new Dictionary<string, object> { { "Int32", 2 } };
+                var expectedId2 = Helpers.CreateEntityId("test", keys2, type.FullName).Result;
+                var document2 = new SubTestEntity() { Int32 = 2, Prop1 = "value1", Prop2 = "value2" };
+
+                var collectionKeys = new string[] { expectedId, expectedId2 };
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
 
-                bucket.RemoveAsyncString = (document) =>
-                {
-                    return Task<CouchbaseDb.IOperationResult>.Factory.StartNew(() =>
-                    {
-                        deleteCalled = true;
+                bucket.Items.Add(expectedId, document1);
+                bucket.Cas.Add(expectedId, 1);
+                bucket.Items.Add(expectedId2, document2);
+                bucket.Cas.Add(expectedId2, 1);
+                bucket.Items.Add(collectionId, collectionKeys);
+                bucket.Cas.Add(collectionId, 1);
 
-                        Assert.AreEqual(expectedId, document);
-                        
-                        var result = new CouchbaseDb.Fakes.StubIOperationResult();
-                        result.SuccessGet = () => true;
-                        return result;
-                    });
-                };
+                var command = new DeleteCommand();
+                command.Execute("test", keys, type).Wait();
 
-                var removeFromCollectionCalled = false;
+                Assert.IsTrue(bucket.Items.ContainsKey(expectedId2));
+                Assert.IsFalse(bucket.Items.ContainsKey(expectedId));
 
-                Couchbase.Commands.Fakes.ShimRemoveFromCollectionCommand.AllInstances.ExecuteString = (instance, tenantId) =>
-                {
-                    return Task.Factory.StartNew(() =>
-                    {
-                        removeFromCollectionCalled = true;
-                        Assert.AreEqual("test", tenantId);
-                    });
-                };
-
-                var command = new DeleteCommand(keys, type);
-                command.Execute("test").Wait();
-
-                Assert.IsTrue(deleteCalled);
-                Assert.IsTrue(removeFromCollectionCalled);
+                var remainingKeys = (string[])bucket.Items[collectionId];
+                Assert.AreEqual(1, remainingKeys.Length);
+                Assert.IsTrue(remainingKeys.Contains(expectedId2));
             }
         }
 
         [TestMethod]
         public void Execute_EntityDoesNotExists_ThrowsDbException()
         {
-            var deleteCalled = false;
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.SimpleWithKey") as IEdmEntityType;
+                var type = typeof(TestEntity);
                 var keys = new Dictionary<string, object> { { "Int32", 123 } };
-                var expectedId = Helpers.CreateEntityId("test", keys, type).Result;
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-
-                bucket.RemoveAsyncString = (document) =>
-                {
-                    return Task<CouchbaseDb.IOperationResult>.Factory.StartNew(() =>
-                    {
-                        deleteCalled = true;
-
-                        Assert.AreEqual(expectedId, document);
-
-                        var result = new CouchbaseDb.Fakes.StubIOperationResult();
-                        result.SuccessGet = () => false;
-                        return result;
-                    });
-                };
-
-                var removeFromCollectionCalled = false;
-
-                Couchbase.Commands.Fakes.ShimRemoveFromCollectionCommand.AllInstances.ExecuteString = (instance, tenantId) =>
-                {
-                    return Task.Factory.StartNew(() =>
-                    {
-                        removeFromCollectionCalled = true;
-                        Assert.AreEqual("test", tenantId);
-                    });
-                };
 
                 try
                 {
-                    var command = new DeleteCommand(keys, type);
-                    command.Execute("test").Wait();
+                    var command = new DeleteCommand();
+                    command.Execute("test", keys, type).Wait();
                     Assert.Fail();
                 }
                 catch (AggregateException exception)
@@ -133,9 +85,6 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
                     var firstException = exception.InnerExceptions.First();
                     Assert.IsInstanceOfType(firstException, typeof(DbException));
                 }
-
-                Assert.IsTrue(deleteCalled);
-                Assert.IsFalse(removeFromCollectionCalled);
             }
         }
     }

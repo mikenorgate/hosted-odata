@@ -5,10 +5,14 @@
 
 #region usings
 
+using System;
 using System.Threading.Tasks;
 using System.Web.OData;
+using Couchbase;
+using Fasterflect;
 using Microsoft.OData.Edm;
 using Newtonsoft.Json.Linq;
+using OESoftware.Hosted.OData.Api.Core;
 
 #endregion
 
@@ -17,77 +21,54 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
     /// <summary>
     /// Updates an singleton value
     /// </summary>
-    public class UpdateSingletonCommand : IDbCommand
+    public class UpdateSingletonCommand
     {
-        private readonly EdmEntityObject _entity;
-        private readonly IEdmModel _model;
-        private readonly IEdmSingleton _singleton;
+        private readonly IValueGenerator _valueGenerator;
 
         /// <summary>
-        /// Default Construtor
+        /// Default Constructor
         /// </summary>
-        /// <param name="entity"><see cref="EdmEntityObject"/> to insert</param>
-        /// <param name="singleton">The <see cref="IEdmSingleton"/></param>
-        /// <param name="model">The <see cref="IEdmModel"/> containing the type</param>
-        public UpdateSingletonCommand(EdmEntityObject entity, IEdmSingleton singleton, IEdmModel model)
+        public UpdateSingletonCommand(IValueGenerator valueGenerator)
         {
-            _entity = entity;
-            _singleton = singleton;
-            _model = model;
+            _valueGenerator = valueGenerator;
         }
 
-        Task IDbCommand.Execute(string tenantId)
-        {
-            return Execute(tenantId);
-        }
 
         /// <summary>
         /// Execute this command
         /// </summary>
         /// <param name="tenantId">The id of the tenant</param>
-        /// <returns><see cref="EdmEntityObject"/></returns>
-        public async Task<EdmEntityObject> Execute(string tenantId)
+        /// <param name="singletonType">The type of the singleton</param>
+        /// <param name="delta">Entity delta</param>
+        /// <param name="isPut">True if update should act as a put</param>
+        /// <returns><see cref="IDynamicEntity"/></returns>
+        public async Task<IDynamicEntity> Execute(string tenantId, Type singletonType, Delta delta, bool isPut)
         {
-            using (var bucket = BucketProvider.GetBucket())
+            var bucket = BucketProvider.GetBucket();
+            //Convert entity to document
+            var id = Helpers.CreateSingletonId(tenantId, singletonType.FullName);
+
+            //Get the current version
+            var find = await CommandHelpers.GetDocumentAsync(bucket, singletonType, id);
+
+            if (!find.Success)
             {
-                //Convert entity to document
-                var id = Helpers.CreateSingletonId(tenantId, _singleton);
-
-                var converter = new EntityObjectConverter(new ValueGenerator());
-
-                //Get the current version
-                var find = await bucket.GetDocumentAsync<JObject>(id);
-
-                if (!find.Success)
-                {
-                    return
-                        await
-                            CommandHelpers.InsertSingletonAsync(converter, _entity, tenantId, _singleton, _model, id,
-                                bucket);
-                }
-                var document =
-                    await
-                        converter.ToDocument(_entity, tenantId, _singleton.EntityType(), ConvertOptions.CopyOnlySet,
-                            _model);
-                var mergeSettings = new JsonMergeSettings
-                {
-                    MergeArrayHandling = MergeArrayHandling.Union
-                };
-
-                //Replace the existing values with the new ones
-                find.Content.Merge(document, mergeSettings);
-
-                var result = await bucket.ReplaceAsync(find.Document);
-                if (!result.Success)
-                {
-                    throw ExceptionCreator.CreateDbException(result);
-                }
-
-                //Convert document back to entity
-                var output = converter.ToEdmEntityObject(find.Content, tenantId, _singleton.EntityType());
-
-                return output;
+                return
+                    await CommandHelpers.InsertSingletonAsync(bucket, singletonType, id, tenantId, _valueGenerator, delta, isPut);
             }
+
+            var original = CommandHelpers.ReflectionGetContent<IDynamicEntity>(find);
+
+            delta.CallMethod(isPut ? "Put" : "Patch", original);
+
+            var cas = CommandHelpers.ReflectionGetCas(find);
+            var result = await CommandHelpers.ReplaceDocumentAsync(bucket, singletonType, id, original, cas);
+            if (!result.Success)
+            {
+                throw ExceptionCreator.CreateDbException(result);
+            }
+
+            return original;
         }
     }
 }

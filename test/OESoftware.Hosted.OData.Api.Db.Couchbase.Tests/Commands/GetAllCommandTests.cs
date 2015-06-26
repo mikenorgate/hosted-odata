@@ -11,6 +11,7 @@ using Microsoft.OData.Edm.Validation;
 using Microsoft.QualityTools.Testing.Fakes;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json.Linq;
+using OESoftware.Hosted.OData.Api.Core;
 using OESoftware.Hosted.OData.Api.Db.Couchbase.Commands;
 using CouchbaseDb = Couchbase;
 
@@ -19,78 +20,45 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
     [TestClass]
     public class GetAllCommandTests
     {
-        IEdmModel _model;
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            using (var stringReader = new FileStream("TestDataModel.xml", FileMode.Open))
-            {
-                using (var xmlReader = XmlReader.Create(stringReader))
-                {
-                    IEnumerable<EdmError> errors;
-                    EdmxReader.TryParse(xmlReader, out _model, out errors);
-                }
-            }
-        }
-
         [TestMethod]
         public void Execute_CollectionExists_ReturnsCollection()
         {
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.SimpleWithKey") as IEdmEntityType;
-                var collectionKeys = new JArray(1, 2);
-                var collectionId = Helpers.CreateCollectionId("test", type);
-                var document1 = new JObject() { { "Int32", 1 }, { "Prop1", "value1" }, { "Prop2", "value2" } };
-                var document2 = new JObject() { { "Int32", 2 }, { "Prop1", "value1" }, { "Prop2", "value2" } };
+                var type = typeof(TestEntity);
+                var collectionId = Helpers.CreateCollectionId("test", type.FullName);
+
+                var keys = new Dictionary<string, object> { { "Int32", 1 } };
+                var expectedId = Helpers.CreateEntityId("test", keys, type.FullName).Result;
+                var document1 = new TestEntity() { Int32 = 1, Prop1 = "value1", Prop2 = "value2" };
+
+                var keys2 = new Dictionary<string, object> { { "Int32", 2 } };
+                var expectedId2 = Helpers.CreateEntityId("test", keys2, type.FullName).Result;
+                var document2 = new TestEntity() { Int32 = 2, Prop1 = "value1", Prop2 = "value2" };
+
+                var collectionKeys = new string[] {expectedId, expectedId2};
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetAsyncOf1String((id) =>
-                {
-                    return Task<CouchbaseDb.IOperationResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(collectionId, id);
 
-                        var result = new CouchbaseDb.Fakes.StubIOperationResult<JArray>();
-                        result.SuccessGet = () => true;
-                        result.ValueGet = () => collectionKeys;
-                        return result;
-                    });
-                });
+                bucket.Items.Add(expectedId, document1);
+                bucket.Cas.Add(expectedId, 1);
+                bucket.Items.Add(expectedId2, document2);
+                bucket.Cas.Add(expectedId2, 1);
+                bucket.Items.Add(collectionId, collectionKeys);
+                bucket.Cas.Add(collectionId, 1);
 
-                bucket.GetOf1IListOfString((ids) =>
-                {
-                    var result = new Dictionary<string, CouchbaseDb.IOperationResult<JObject>>();
-                    var key1 = Helpers.CreateEntityId("test", new Dictionary<string, object>() { { "Int32", 1 } }, type).Result;
-                    var operation1 = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
-                    operation1.SuccessGet = () => true;
-                    operation1.ValueGet = () => document1;
-                    result.Add(key1, operation1);
+                var command = new GetAllCommand();
+                var collection = command.Execute("test", type).Result;
 
-                    var key2 = Helpers.CreateEntityId("test", new Dictionary<string, object>() { { "Int32", 2 } }, type).Result;
-                    var operation2 = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
-                    operation2.SuccessGet = () => true;
-                    operation2.ValueGet = () => document2;
-                    result.Add(key2, operation2);
-                    return result;
-                });
+                Assert.AreEqual(2, collection.Count());
+                var item1 = (TestEntity)collection.First(f=>((TestEntity)f).Int32 == 1);
+                Assert.AreEqual(document1, item1);
 
-                var command = new GetAllCommand(type);
-                var collection = command.Execute("test").Result;
-
-                Assert.AreEqual(2, collection.Count);
-                var item1 = collection[0];
-                object value;
-                Assert.IsTrue(item1.TryGetPropertyValue("Int32", out value));
-                Assert.AreEqual(1, value);
-
-                var item2 = collection[1];
-                Assert.IsTrue(item2.TryGetPropertyValue("Int32", out value));
-                Assert.AreEqual(2, value);
+                var item2 = (TestEntity)collection.First(f => ((TestEntity)f).Int32 == 2);
+                Assert.AreEqual(document2, item2);
             }
         }
 
@@ -99,29 +67,18 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
         {
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.SimpleWithKey") as IEdmEntityType;
-                var collectionId = Helpers.CreateCollectionId("test", type);
+                var type = typeof(TestEntity);
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetAsyncOf1String((id) =>
-                {
-                    return Task<CouchbaseDb.IOperationResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(collectionId, id);
-
-                        var result = new CouchbaseDb.Fakes.StubIOperationResult<JArray>();
-                        result.SuccessGet = () => false;
-                        return result;
-                    });
-                });
 
                 try
                 {
-                    var command = new GetAllCommand(type);
-                    var collection = command.Execute("test").Result;
+                    var command = new GetAllCommand();
+                    var collection = command.Execute("test", type).Result;
+                    Assert.Fail();
                 }
                 catch (AggregateException exception)
                 {
@@ -137,52 +94,33 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
         {
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.SimpleWithKey") as IEdmEntityType;
-                var collectionKeys = new JArray(1, 2);
-                var collectionId = Helpers.CreateCollectionId("test", type);
-                var document1 = new JObject() { { "Int32", 1 }, { "Prop1", "value1" }, { "Prop2", "value2" } };
+                var type = typeof(TestEntity);
+                var collectionId = Helpers.CreateCollectionId("test", type.FullName);
+
+                var keys = new Dictionary<string, object> { { "Int32", 1 } };
+                var expectedId = Helpers.CreateEntityId("test", keys, type.FullName).Result;
+                var document1 = new TestEntity() { Int32 = 1, Prop1 = "value1", Prop2 = "value2" };
+
+                var keys2 = new Dictionary<string, object> { { "Int32", 2 } };
+                var expectedId2 = Helpers.CreateEntityId("test", keys2, type.FullName).Result;
+
+                var collectionKeys = new string[] { expectedId, expectedId2 };
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetAsyncOf1String((id) =>
-                {
-                    return Task<CouchbaseDb.IOperationResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(collectionId, id);
 
-                        var result = new CouchbaseDb.Fakes.StubIOperationResult<JArray>();
-                        result.SuccessGet = () => true;
-                        result.ValueGet = () => collectionKeys;
-                        return result;
-                    });
-                });
+                bucket.Items.Add(expectedId, document1);
+                bucket.Cas.Add(expectedId, 1);
+                bucket.Items.Add(collectionId, collectionKeys);
+                bucket.Cas.Add(collectionId, 1);
+                var command = new GetAllCommand();
+                var collection = command.Execute("test", type).Result;
 
-                bucket.GetOf1IListOfString((ids) =>
-                {
-                    var result = new Dictionary<string, CouchbaseDb.IOperationResult<JObject>>();
-                    var key1 = Helpers.CreateEntityId("test", new Dictionary<string, object>() { { "Int32", 1 } }, type).Result;
-                    var operation1 = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
-                    operation1.SuccessGet = () => true;
-                    operation1.ValueGet = () => document1;
-                    result.Add(key1, operation1);
-
-                    var key2 = Helpers.CreateEntityId("test", new Dictionary<string, object>() { { "Int32", 2 } }, type).Result;
-                    var operation2 = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
-                    operation2.SuccessGet = () => false;
-                    result.Add(key2, operation2);
-                    return result;
-                });
-
-                var command = new GetAllCommand(type);
-                var collection = command.Execute("test").Result;
-
-                Assert.AreEqual(1, collection.Count);
-                var item1 = collection[0];
-                object value;
-                Assert.IsTrue(item1.TryGetPropertyValue("Int32", out value));
-                Assert.AreEqual(1, value);
+                Assert.AreEqual(1, collection.Count());
+                var item1 = (TestEntity)collection.First();
+                Assert.AreEqual(document1, item1);
             }
         }
 
@@ -191,61 +129,43 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Tests.Commands
         {
             using (ShimsContext.Create())
             {
-                var type = _model.FindDeclaredType("Test.SubInheritedType") as IEdmEntityType;
-                var castType = _model.FindDeclaredType("Test.BaseType") as IEdmEntityType;
-                var collectionKeys = new JArray(1, 2);
-                var collectionId = Helpers.CreateCollectionId("test", type);
-                var document1 = new JObject() { { "Int32", 1 }, { "Prop1", "value1" }, { "Prop2", "value2" } };
-                var document2 = new JObject() { { "Int32", 2 }, { "Prop1", "value1" }, { "Prop2", "value2" } };
+                var type = typeof(SubTestEntity);
+                var castType = typeof(TestEntity);
+                var collectionId = Helpers.CreateCollectionId("test", type.FullName);
+
+                var keys = new Dictionary<string, object> { { "Int32", 1 } };
+                var expectedId = Helpers.CreateEntityId("test", keys, type.FullName).Result;
+                var document1 = new SubTestEntity() { Int32 = 1, Prop1 = "value1", Prop2 = "value2" };
+
+                var keys2 = new Dictionary<string, object> { { "Int32", 2 } };
+                var expectedId2 = Helpers.CreateEntityId("test", keys2, type.FullName).Result;
+                var document2 = new SubTestEntity() { Int32 = 2, Prop1 = "value1", Prop2 = "value2" };
+
+                var collectionKeys = new string[] { expectedId, expectedId2 };
 
                 CouchbaseDb.Fakes.ShimCluster.ConstructorString = (i, v) => { };
 
-                var bucket = new CouchbaseDb.Core.Fakes.StubIBucket();
+                var bucket = new TestBucket();
                 Fakes.ShimBucketProvider.GetBucket = () => bucket;
-                bucket.GetAsyncOf1String((id) =>
-                {
-                    return Task<CouchbaseDb.IOperationResult<JArray>>.Factory.StartNew(() =>
-                    {
-                        Assert.AreEqual(collectionId, id);
 
-                        var result = new CouchbaseDb.Fakes.StubIOperationResult<JArray>();
-                        result.SuccessGet = () => true;
-                        result.ValueGet = () => collectionKeys;
-                        return result;
-                    });
-                });
+                bucket.Items.Add(expectedId, document1);
+                bucket.Cas.Add(expectedId, 1);
+                bucket.Items.Add(expectedId2, document2);
+                bucket.Cas.Add(expectedId2, 1);
+                bucket.Items.Add(collectionId, collectionKeys);
+                bucket.Cas.Add(collectionId, 1);
 
-                bucket.GetOf1IListOfString((ids) =>
-                {
-                    var result = new Dictionary<string, CouchbaseDb.IOperationResult<JObject>>();
-                    var key1 = Helpers.CreateEntityId("test", new Dictionary<string, object>() { { "Int32", 1 } }, type).Result;
-                    var operation1 = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
-                    operation1.SuccessGet = () => true;
-                    operation1.ValueGet = () => document1;
-                    result.Add(key1, operation1);
+                var command = new GetAllCommand();
+                var collection = command.Execute("test", type, castType).Result;
 
-                    var key2 = Helpers.CreateEntityId("test", new Dictionary<string, object>() { { "Int32", 2 } }, type).Result;
-                    var operation2 = new CouchbaseDb.Fakes.StubIOperationResult<JObject>();
-                    operation2.SuccessGet = () => true;
-                    operation2.ValueGet = () => document2;
-                    result.Add(key2, operation2);
-                    return result;
-                });
+                Assert.AreEqual(2, collection.Count());
+                var item1 = collection.First(f => ((TestEntity)f).Int32 == 1);
+                Assert.IsInstanceOfType(item1, castType);
+                Assert.AreEqual(document1, item1);
 
-                var command = new GetAllCommand(type);
-                var collection = command.Execute("test", castType).Result;
-
-                Assert.AreEqual(2, collection.Count);
-                var item1 = collection[0] as EdmEntityObject;
-                object value;
-                Assert.IsTrue(item1.TryGetPropertyValue("Int32", out value));
-                Assert.AreEqual(1, value);
-                Assert.AreEqual(1, item1.GetChangedPropertyNames().Count());
-
-                var item2 = collection[1] as EdmEntityObject;
-                Assert.IsTrue(item2.TryGetPropertyValue("Int32", out value));
-                Assert.AreEqual(2, value);
-                Assert.AreEqual(1, item2.GetChangedPropertyNames().Count());
+                var item2 = collection.First(f => ((TestEntity)f).Int32 == 2);
+                Assert.IsInstanceOfType(item2, castType);
+                Assert.AreEqual(document2, item2);
             }
         }
     }

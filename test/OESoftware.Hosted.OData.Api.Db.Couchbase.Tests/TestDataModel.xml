@@ -149,10 +149,20 @@
       <ComplexType Name="ComplexSubInheritedType" BaseType="Test.ComplexInheritedType">
         <Property Name="Prop2" Type="Edm.String" Nullable="false"></Property>
       </ComplexType>
+      
+      <EntityType Name="SimpleWithNavigation">
+        <Key>
+          <PropertyRef Name="Int32"/>
+        </Key>
+        <Property Name="Int32" Type="Edm.Int32" Nullable="false"></Property>
+        <NavigationProperty Name="Collection" Type="Collection(Test.BaseType)"></NavigationProperty>
+        <NavigationProperty Name="Single" Type="Test.BaseType"></NavigationProperty>
+      </EntityType>
     </Schema>
     <Schema Namespace="ODataWebExperimental.Northwind.Model" xmlns="http://docs.oasis-open.org/odata/ns/edm">
       <EntityContainer xmlns:p4="http://schemas.microsoft.com/ado/2009/02/edm/annotation" Name="TestEntities" p4:LazyLoadingEnabled="true">
         <Singleton Name="Singleton" Type="Test.Singleton" />
+        <EntitySet Name="SimpleWithNavigation" EntityType="Test.SimpleWithNavigation" />
       </EntityContainer>
     </Schema>
   </edmx:DataServices>

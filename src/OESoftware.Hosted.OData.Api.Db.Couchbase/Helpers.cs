@@ -14,6 +14,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web.OData;
 using Microsoft.OData.Edm;
+using OESoftware.Hosted.OData.Api.Core;
 
 #endregion
 
@@ -24,6 +25,23 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
     /// </summary>
     public static class Helpers
     {
+        /// <summary>
+        /// Create a id key for a entity in a collection
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="entity"><see cref="IDynamicEntity"/></param>
+        /// <returns>An id key</returns>
+        public static async Task<string> CreateEntityId(string tenantId, IDynamicEntity entity)
+        {
+            var values = new List<string>();
+            foreach (var property in entity.GetKeys().OrderBy(k => k.Key))
+            {
+                values.Add(property.Value.ToString());
+            }
+
+            return string.Format("{0}:{1}:{2}", tenantId, entity.GetType().FullName, await HashKeyValues(values));
+        }
+
         /// <summary>
         /// Create a id key for a entity in a collection
         /// </summary>
@@ -84,6 +102,25 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
 
         /// <summary>
         /// Create a id key for a entity in a collection
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="keys">A dictionary of the entity keys</param>
+        /// <param name="entityType">The type of the entity</param>
+        /// <returns>An id key</returns>
+        public static async Task<string> CreateEntityId(string tenantId, IDictionary<string, object> keys,
+            string entityType)
+        {
+            var values = new List<string>();
+            foreach (var property in keys.OrderBy(k => k.Key))
+            {
+                values.Add(property.Value.ToString());
+            }
+
+            return string.Format("{0}:{1}:{2}", tenantId, entityType, await HashKeyValues(values));
+        }
+
+        /// <summary>
+        /// Create a id key for a entity in a collection
         /// Takes the keys from keys if not in entity
         /// </summary>
         /// <param name="tenantId">The id of the tenant</param>
@@ -135,6 +172,17 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         }
 
         /// <summary>
+        /// Create a id key for the collection
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="entityType">The type of the entity</param>
+        /// <returns>An id key</returns>
+        public static string CreateCollectionId(string tenantId, string entityType)
+        {
+            return string.Format("{0}:c:{1}", tenantId, entityType);
+        }
+
+        /// <summary>
         /// Create a id key for the singleton
         /// </summary>
         /// <param name="tenantId">The id of the tenant</param>
@@ -143,6 +191,17 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
         public static string CreateSingletonId(string tenantId, IEdmSingleton singleton)
         {
             return string.Format("{0}:{1}", tenantId, singleton.EntityType().FullTypeName());
+        }
+
+        /// <summary>
+        /// Create a id key for the singleton
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="singletonType">The type of the singleton</param>
+        /// <returns>An id key</returns>
+        public static string CreateSingletonId(string tenantId, string singletonType)
+        {
+            return string.Format("{0}:{1}", tenantId, singletonType);
         }
 
         /// <summary>

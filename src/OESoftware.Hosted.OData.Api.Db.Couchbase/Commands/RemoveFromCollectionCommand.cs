@@ -5,6 +5,7 @@
 
 #region usings
 
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.OData.Edm;
@@ -17,49 +18,35 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
     /// <summary>
     /// Removes an id from a collection
     /// </summary>
-    public class RemoveFromCollectionCommand : IDbCommand
+    public class RemoveFromCollectionCommand
     {
-        private readonly IEdmEntityType _entityType;
-        private readonly string _key;
-
-        /// <summary>
-        /// Default Constructor
-        /// </summary>
-        /// <param name="key">The key to remove from the collection</param>
-        /// <param name="entityType">The <see cref="IEdmEntityType"/> of the collection</param>
-        public RemoveFromCollectionCommand(string key, IEdmEntityType entityType)
-        {
-            _key = key;
-            _entityType = entityType;
-        }
-        
         /// <summary>
         /// Execute this command
         /// </summary>
         /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="key">The key of the item to remove from the collection</param>
+        /// <param name="entityType">The type of the entity</param>
         /// <returns>void</returns>
-        public async Task Execute(string tenantId)
+        public async Task Execute(string tenantId, string key, Type entityType)
         {
-            using (var bucket = BucketProvider.GetBucket())
+            var bucket = BucketProvider.GetBucket();
+            var id = Helpers.CreateCollectionId(tenantId, entityType.FullName);
+            var existing = await bucket.GetDocumentAsync<string[]>(id);
+            if (existing.Success)
             {
-                var id = Helpers.CreateCollectionId(tenantId, _entityType);
-                var existing = await bucket.GetDocumentAsync<JArray>(id);
-                if (existing.Success)
+                var updated = existing.Document.Content.Where(w => w != key).ToArray();
+
+                if (updated.Length == existing.Content.Length)
                 {
-                    var match = existing.Content.FirstOrDefault(j => j.Value<string>().Equals(_key));
-                    if (match == null)
-                    {
-                        //Id is not in collection, nothing to do;
-                        return;
-                    }
-                    existing.Document.Content.Remove(match);
-                    var updateResult = await bucket.ReplaceAsync(existing.Document);
-                    if (!updateResult.Success)
-                    {
-                        //If the update failed then another thread got there first
-                        //Try again
-                        await Execute(tenantId);
-                    }
+                    return;
+                }
+
+                var updateResult = await bucket.ReplaceAsync(id, updated, existing.Document.Cas);
+                if (!updateResult.Success)
+                {
+                    //If the update failed then another thread got there first
+                    //Try again
+                    await Execute(tenantId, key, entityType);
                 }
             }
         }

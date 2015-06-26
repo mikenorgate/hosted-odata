@@ -8,6 +8,7 @@
 using System.Threading.Tasks;
 using System.Web.OData;
 using Microsoft.OData.Edm;
+using OESoftware.Hosted.OData.Api.Core;
 
 #endregion
 
@@ -16,60 +17,40 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
     /// <summary>
     /// Insert an entity
     /// </summary>
-    public class InsertCommand : IDbCommand
+    public class InsertCommand
     {
-        private readonly EdmEntityObject _entity;
-        private readonly IEdmEntityType _entityType;
-        private readonly IEdmModel _model;
+        private readonly IValueGenerator _valueGenerator;
 
         /// <summary>
         /// Default Constructor
         /// </summary>
-        /// <param name="entity"><see cref="EdmEntityObject"/> to insert</param>
-        /// <param name="entityType">The <see cref="IEdmEntityType"/> of entity</param>
-        /// <param name="model">The <see cref="IEdmModel"/> containing the type</param>
-        public InsertCommand(EdmEntityObject entity, IEdmEntityType entityType, IEdmModel model)
+        public InsertCommand(IValueGenerator valueGenerator)
         {
-            _entity = entity;
-            _entityType = entityType;
-            _model = model;
-        }
-
-        Task IDbCommand.Execute(string tenantId)
-        {
-            return Execute(tenantId);
+            _valueGenerator = valueGenerator;
         }
 
         /// <summary>
         /// Execute this command
         /// </summary>
+        /// <param name="entity"><see cref="IDynamicEntity"/></param>
         /// <param name="tenantId">The id of the tenant</param>
         /// <returns><see cref="EdmEntityObject"/></returns>
-        public async Task<EdmEntityObject> Execute(string tenantId)
+        public async Task<IDynamicEntity> Execute(string tenantId, IDynamicEntity entity)
         {
-            //Convert entity to document
-            var converter = new EntityObjectConverter(new ValueGenerator());
+            await _valueGenerator.ComputeValues(tenantId, entity);
+            var id = await Helpers.CreateEntityId(tenantId, entity);
 
-            var document =
-                await converter.ToDocument(_entity, tenantId, _entityType, ConvertOptions.ComputeValues, _model);
-
-            var id = await Helpers.CreateEntityId(tenantId, _entity, _entityType);
-            using (var bucket = BucketProvider.GetBucket())
+            var bucket = BucketProvider.GetBucket();
+            var result = await bucket.InsertAsync(id, entity);
+            if (!result.Success)
             {
-                var result = await bucket.InsertAsync(id, document);
-                if (!result.Success)
-                {
-                    throw ExceptionCreator.CreateDbException(result);
-                }
-
-                var addToCollection = new AddToCollectionCommand(id, _entityType);
-                await addToCollection.Execute(tenantId);
-
-                //Convert document back to entity
-                var output = converter.ToEdmEntityObject(document, tenantId, _entityType);
-
-                return output;
+                throw ExceptionCreator.CreateDbException(result);
             }
+
+            var addToCollection = new AddToCollectionCommand();
+            await addToCollection.Execute(tenantId, id, entity.GetType());
+
+            return entity;
         }
     }
 }
