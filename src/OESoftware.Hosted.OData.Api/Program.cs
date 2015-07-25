@@ -11,6 +11,7 @@ namespace OESoftware.Hosted.OData.Api
             using (WebApp.Start<Startup>(baseUrl))
             {
                 Console.WriteLine("Press Enter to quit.");
+
                 Console.ReadKey();
 
             }

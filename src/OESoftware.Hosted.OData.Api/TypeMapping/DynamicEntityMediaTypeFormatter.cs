@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Formatting;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web.OData;
 using System.Web.OData.Extensions;
@@ -16,11 +18,14 @@ using System.Web.OData.Routing;
 using Microsoft.OData.Core;
 using Microsoft.OData.Edm;
 using OESoftware.Hosted.OData.Api.Core;
+using Common.Logging;
 
 namespace OESoftware.Hosted.OData.Api.TypeMapping
 {
     public class DynamicEntityMediaTypeFormatter : ODataMediaTypeFormatter
     {
+        private static readonly ILog Log = LogManager.GetLogger(typeof(DynamicEntityMediaTypeFormatter));
+
         public DynamicEntityMediaTypeFormatter(IEnumerable<ODataPayloadKind> payloadKinds) : base(payloadKinds)
         {
         }
@@ -54,7 +59,7 @@ namespace OESoftware.Hosted.OData.Api.TypeMapping
                     var deltaType = typeof (Delta<>);
                     type = deltaType.MakeGenericType(clrType);
                 }
-                else
+                else if (type == (typeof(IDynamicEntity)))
                 {
                     type = clrType;
                 }

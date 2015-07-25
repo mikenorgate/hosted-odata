@@ -41,7 +41,7 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
             var result = await bucket.GetDocumentAsync<string[]>(id);
             if (!result.Success)
             {
-                throw ExceptionCreator.CreateDbException(result);
+                return new List<IDynamicEntity>();
             }
 
             return CommandHelpers.GetAll(bucket, result.Content, entityType, castType);

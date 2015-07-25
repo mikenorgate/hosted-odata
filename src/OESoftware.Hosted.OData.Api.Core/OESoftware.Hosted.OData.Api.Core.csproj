@@ -65,7 +65,9 @@
     <Compile Include="EdmTypeToClrType.cs" />
     <Compile Include="IDynamicEntity.cs" />
     <Compile Include="Logging\MethodLoggingAspect.cs" />
+    <Compile Include="NavigationPartnerAttribute.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ReferentialConstraintAttribute.cs" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

@@ -50,22 +50,5 @@ namespace OESoftware.Hosted.OData.Api
             config.EnsureInitialized();
             return config;
         }
-
-        private static ODataMediaTypeFormatter CreateFormatterWithoutMediaTypes(ODataSerializerProvider serializerProvider, ODataDeserializerProvider deserializerProvider, params ODataPayloadKind[] payloadKinds)
-        {
-            ODataMediaTypeFormatter formatter = new ODataMediaTypeFormatter(deserializerProvider, serializerProvider, payloadKinds);
-            AddSupportedEncodings(formatter);
-            return formatter;
-        }
-
-        private static void AddSupportedEncodings(MediaTypeFormatter formatter)
-        {
-            formatter.SupportedEncodings.Add(new UTF8Encoding(encoderShouldEmitUTF8Identifier: false,
-                throwOnInvalidBytes: true));
-            formatter.SupportedEncodings.Add(new UnicodeEncoding(bigEndian: false, byteOrderMark: true,
-                throwOnInvalidBytes: true));
-        }
-
-        
     }
 }

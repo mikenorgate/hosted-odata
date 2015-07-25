@@ -7,9 +7,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Data.HashFunction;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.OData;
@@ -98,6 +100,31 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
             }
 
             return string.Format("{0}:{1}:{2}", tenantId, entityType.FullTypeName(), await HashKeyValues(values));
+        }
+
+        // <summary>
+        /// Create a id key for a entity in a collection
+        /// </summary>
+        /// <param name="tenantId">The id of the tenant</param>
+        /// <param name="keys">A dictionary of the entity keys</param>
+        /// <param name="entityType"><see cref="IEdmEntityType"/></param>
+        /// <returns>An id key</returns>
+        public static async Task<string> CreateEntityId(string tenantId, IDictionary<string, object> keys,
+            Type entityType)
+        {
+            var values = new List<string>();
+            var allKeyProperties = GetAllKeys(entityType);
+            foreach (var property in allKeyProperties.OrderBy(k => k.Name))
+            {
+                if (!keys.ContainsKey(property.Name))
+                {
+                    throw new KeyNotFoundException(string.Format("No value for key {0} was found", property.Name));
+                }
+
+                values.Add(keys[property.Name].ToString());
+            }
+
+            return string.Format("{0}:{1}:{2}", tenantId, entityType.FullName, await HashKeyValues(values));
         }
 
         /// <summary>
@@ -261,6 +288,24 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase
                     properties.AddRange(tempType.DeclaredKey);
                 }
             }
+
+            return properties;
+        }
+
+        /// <summary>
+        /// Get all the properties for a type
+        /// </summary>
+        /// <param name="entityType"><see cref="IEdmStructuredType"/></param>
+        /// <returns>List of <see cref="IEdmProperty"/></returns>
+        private static List<PropertyInfo> GetAllKeys(Type entityType)
+        {
+            var properties = entityType.GetProperties()
+            .Where(
+                p =>
+                    p.GetCustomAttributes(typeof(KeyAttribute), true)
+                    .Any()
+                )
+            .ToList();
 
             return properties;
         }

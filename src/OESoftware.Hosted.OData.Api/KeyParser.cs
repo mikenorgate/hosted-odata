@@ -45,6 +45,11 @@ namespace OESoftware.Hosted.OData.Api
                         value = Single.Parse(keyAsString);
                         break;
                     }
+                case EdmConstants.EdmStringTypeName:
+                {
+                    value = keyAsString.Replace("'", "");
+                    break;
+                }
                 default:
                     {
                         throw new ApplicationException(string.Format("Unable to parse key {0}", keyAsString));

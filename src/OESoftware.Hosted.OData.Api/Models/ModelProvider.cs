@@ -76,6 +76,9 @@ namespace OESoftware.Hosted.OData.Api.Models
                 throw new ApplicationException("Invalid DB identifier");
             }
 
+            var a = new DynamicAssembyGenerator();
+            a.Create(model);
+
             var xmlBuilder = new StringBuilder();
             IEnumerable<EdmError> errors;
             using (var xmlWriter = XmlWriter.Create(xmlBuilder, new XmlWriterSettings() { Encoding = Encoding.UTF32 }))
@@ -105,8 +108,7 @@ namespace OESoftware.Hosted.OData.Api.Models
                     return false;
                 }
             }
-            var a = new DynamicAssembyGenerator();
-            a.Create(model);
+            
             return true;
         }
 

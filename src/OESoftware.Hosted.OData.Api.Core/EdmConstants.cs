@@ -147,6 +147,8 @@ namespace OESoftware.Hosted.OData.Api.Core
 
         internal const string EntityPathWithCast = "~/entityset/key/cast";
 
+        internal const string EntityNavigationPathRef = "~/entityset/key/navigation/$ref";
+
         #endregion
     }
 }

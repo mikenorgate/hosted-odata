@@ -15,6 +15,8 @@ using System.Web.OData.Query;
 using System.Web.OData.Results;
 using System.Web.OData.Routing;
 using Fasterflect;
+using Microsoft.OData.Core.UriParser;
+using Microsoft.OData.Core.UriParser.Semantic;
 using Microsoft.OData.Edm;
 using OESoftware.Hosted.OData.Api.Attributes;
 using OESoftware.Hosted.OData.Api.Core;
@@ -23,6 +25,7 @@ using OESoftware.Hosted.OData.Api.Db.Couchbase;
 using OESoftware.Hosted.OData.Api.Db.Couchbase.Commands;
 using OESoftware.Hosted.OData.Api.Extensions;
 using OESoftware.Hosted.OData.Api.TypeMapping;
+using ODataPath = System.Web.OData.Routing.ODataPath;
 
 namespace OESoftware.Hosted.OData.Api.Controllers
 {
@@ -64,7 +67,9 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var castType = EdmLibHelpers.GetClrType(CastTypeFromPath(), model);
             if (!entityType.Inherits(castType))
             {
-                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName, castType.FullName));
+                return
+                    BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName,
+                        castType.FullName));
             }
 
             var path = Request.ODataProperties().Path;
@@ -150,7 +155,9 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var castType = EdmLibHelpers.GetClrType(CastTypeFromPath(), model);
             if (!entityType.Inherits(castType))
             {
-                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName, castType.FullName));
+                return
+                    BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName,
+                        castType.FullName));
             }
 
             var path = Request.ODataProperties().Path;
@@ -235,7 +242,9 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var castType = EdmLibHelpers.GetClrType(CastTypeFromPath(), model);
             if (!entityType.Inherits(castType))
             {
-                return BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName, castType.FullName));
+                return
+                    BadRequest(string.Format("Enity type {0} does not inherit from {1}", entityType.FullName,
+                        castType.FullName));
             }
 
             var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
@@ -302,7 +311,9 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var command = new UpdateCommand();
             try
             {
-                var result = await command.Execute(dbIdentifier, keys, EdmLibHelpers.GetClrType(entityType, model), entity, false);
+                var result =
+                    await
+                        command.Execute(dbIdentifier, keys, EdmLibHelpers.GetClrType(entityType, model), entity, false);
 
                 return DynamicUpdated(result);
             }
@@ -332,7 +343,8 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var command = new UpdateSingletonCommand(new ValueGenerator());
             try
             {
-                var result = await command.Execute(dbIdentifier, EdmLibHelpers.GetClrType(entityType.Type, model), entity, false);
+                var result =
+                    await command.Execute(dbIdentifier, EdmLibHelpers.GetClrType(entityType.Type, model), entity, false);
 
                 return DynamicOk(result);
             }
@@ -366,7 +378,8 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var command = new UpdateCommand();
             try
             {
-                var result = await command.Execute(dbIdentifier, keys, EdmLibHelpers.GetClrType(entityType, model), entity, true);
+                var result =
+                    await command.Execute(dbIdentifier, keys, EdmLibHelpers.GetClrType(entityType, model), entity, true);
 
                 return DynamicUpdated(result);
             }
@@ -396,7 +409,8 @@ namespace OESoftware.Hosted.OData.Api.Controllers
             var command = new UpdateSingletonCommand(new ValueGenerator());
             try
             {
-                var result = await command.Execute(dbIdentifier, EdmLibHelpers.GetClrType(entityType.Type, model), entity, false);
+                var result =
+                    await command.Execute(dbIdentifier, EdmLibHelpers.GetClrType(entityType.Type, model), entity, false);
 
                 return DynamicOk(result);
             }
@@ -501,6 +515,84 @@ namespace OESoftware.Hosted.OData.Api.Controllers
                 return BadRequest();
             }
         }
+
+        [ODataPath(EdmConstants.EntityNavigationPath)]
+        public async Task<IHttpActionResult> GetNavigationReference()
+        {
+            var model = Request.ODataProperties().Model;
+
+            var entityType = EntityTypeFromPath();
+            var path = Request.ODataProperties().Path;
+            var keyProperty = path.Segments[1] as KeyValuePathSegment;
+
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+
+            var navigationSection = path.Segments[2] as NavigationPathSegment;
+
+            try
+            {
+                var relationCommand = new GetRelationCommand();
+
+                var entities = await relationCommand.Execute(dbIdentifier, keyProperty.ParseKeyValue(entityType), EdmLibHelpers.GetClrType(entityType, model), navigationSection.NavigationProperty.Name);
+
+                if (navigationSection.NavigationProperty.TargetMultiplicity() == EdmMultiplicity.Many)
+                {
+                    return DynamicOk(entities,
+                        EdmLibHelpers.GetClrType(navigationSection.NavigationProperty.Type.AsCollection().CollectionDefinition().ElementType, model));
+                }
+
+                return DynamicOk(entities.First());
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
+        }
+
+        [ODataPath(EdmConstants.EntityNavigationPathRef)]
+        public async Task<IHttpActionResult> PostNavigationReference([FromBody] Uri link)
+        {
+            var model = Request.ODataProperties().Model;
+
+            var entityType = EntityTypeFromPath();
+            var path = Request.ODataProperties().Path;
+            var keyProperty = path.Segments[1] as KeyValuePathSegment;
+
+            var dbIdentifier = Request.GetOwinEnvironment()["DbId"] as string;
+
+
+            var rootPath = link.AbsoluteUri.Substring(0, link.AbsoluteUri.LastIndexOf('/') + 1);
+
+            var odataUriParser = new ODataUriParser(model, new Uri(rootPath), link);
+
+            var odataLink = odataUriParser.ParsePath();
+            var keySegment = odataLink.LastSegment as KeySegment;
+
+            var navigationSection = path.Segments[2] as NavigationPathSegment;
+
+            try
+            {
+                var relationCommand = new CreateRelationCommand();
+
+                await relationCommand.Execute(dbIdentifier, keyProperty.ParseKeyValue(entityType), EdmLibHelpers.GetClrType(entityType, model),
+                    keySegment.Keys.ToDictionary(k => k.Key, v => v.Value), EdmLibHelpers.GetClrType(path.EdmType, model), navigationSection.NavigationProperty.Name);
+
+                return new StatusCodeResult(HttpStatusCode.NoContent, this);
+            }
+            catch (DbException ex)
+            {
+                return FromDbException(ex);
+            }
+            catch (KeyNotFoundException)
+            {
+                return BadRequest();
+            }
+        }
+
 
         private ODataQueryOptions GetODataQueryOptions(IEdmType edmType, IEdmModel model, ODataPath path)
         {

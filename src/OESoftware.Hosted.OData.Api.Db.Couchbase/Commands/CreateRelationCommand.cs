@@ -7,10 +7,16 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Web.OData;
+using Couchbase;
+using Couchbase.Core;
+using Fasterflect;
 using Microsoft.OData.Edm;
 using Newtonsoft.Json.Linq;
+using OESoftware.Hosted.OData.Api.Core;
 
 #endregion
 
@@ -19,85 +25,101 @@ namespace OESoftware.Hosted.OData.Api.Db.Couchbase.Commands
     /// <summary>
     /// Creates a relation between two entities
     /// </summary>
-    public class CreateRelationCommand : IDbCommand
+    public class CreateRelationCommand
     {
-        private readonly IDictionary<string, object> _primaryEntityKeys;
-        private readonly IDictionary<string, object> _secondaryEntityKeys;
-        private readonly IEdmNavigationProperty _navigationProperty;
-        private readonly IEdmModel _model;
 
-        /// <summary>
-        /// Default Construtor
-        /// </summary>
-        /// <param name="keys">A dictionary of the keys for the entity</param>
-        /// <param name="entity"><see cref="EdmEntityObject"/> to insert</param>
-        /// <param name="entityType">The <see cref="IEdmEntityType"/> of the collection</param>
-        /// <param name="model">The <see cref="IEdmModel"/> containing the type</param>
-        public CreateRelationCommand(IDictionary<string, object> primaryEntityKeys, IDictionary<string, object> secondaryEntityKeys, IEdmNavigationProperty navigationProperty,
-            IEdmModel model)
-        {
-            _primaryEntityKeys = primaryEntityKeys;
-            _secondaryEntityKeys = secondaryEntityKeys;
-            _navigationProperty = navigationProperty;
-            _model = model;
-        }
-
-        Task IDbCommand.Execute(string tenantId)
-        {
-            return Execute(tenantId);
-        }
-
-        /// <summary>
-        /// Execute this command
-        /// </summary>
-        /// <param name="tenantId">The id of the tenant</param>
-        public async Task Execute(string tenantId)
+        public async Task Execute(string tenantId, IDictionary<string, object> primaryEntityKeys, Type primaryType, IDictionary<string, object> secondaryEntityKeys, Type secondaryType, string navigationProperty)
         {
             var bucket = BucketProvider.GetBucket();
-            var primaryId = await Helpers.CreateEntityId(tenantId, _primaryEntityKeys, _navigationProperty.DeclaringEntityType());
-            var secondaryId = await Helpers.CreateEntityId(tenantId, _secondaryEntityKeys, _navigationProperty.ToEntityType());
 
-            //Get the current version
-            var primaryDocument = await bucket.GetDocumentAsync<JObject>(primaryId);
-            if (!primaryDocument.Success)
+            var primaryId = await Helpers.CreateEntityId(tenantId, primaryEntityKeys, primaryType);
+            var secondaryId = await Helpers.CreateEntityId(tenantId, secondaryEntityKeys, secondaryType);
+
+            var result = await CommandHelpers.GetDocumentAsync(bucket, primaryType, primaryId);
+
+            if (!result.Success)
             {
-                throw ExceptionCreator.CreateDbException(primaryDocument);
+                throw ExceptionCreator.CreateDbException(result);
             }
 
-            var secondaryDocument = await bucket.GetDocumentAsync<JObject>(secondaryId);
-            if (!secondaryDocument.Success)
+            var primaryEntity = CommandHelpers.ReflectionGetContent<IDynamicEntity>(result);
+            var primaryCas = CommandHelpers.ReflectionGetCas(result);
+
+            result = await CommandHelpers.GetDocumentAsync(bucket, secondaryType, secondaryId);
+
+            if (!result.Success)
             {
-                throw ExceptionCreator.CreateDbException(secondaryDocument);
+                throw ExceptionCreator.CreateDbException(result);
             }
 
-            if (_navigationProperty.TargetMultiplicity() == EdmMultiplicity.Many)
+            var secondaryEntity = CommandHelpers.ReflectionGetContent<IDynamicEntity>(result);
+            var secondaryCas = CommandHelpers.ReflectionGetCas(result);
+
+            var property = primaryEntity.GetType().GetRuntimeProperty(navigationProperty);
+
+            await UpdateRelation(primaryEntity, primaryCas, property, secondaryEntity, tenantId, bucket);
+
+            var navigationPartnerAttribute = property.GetCustomAttribute<NavigationPartnerAttribute>();
+
+            if (navigationPartnerAttribute != null)
             {
-                var property = primaryDocument.Document.Content.Property(_navigationProperty.Name);
-                JArray array;
-                if (property == null)
+                await UpdateRelation(secondaryEntity, secondaryCas, secondaryEntity.GetType().GetRuntimeProperty(navigationPartnerAttribute.PartnerPropertyName), primaryEntity, tenantId, bucket);
+            }
+        }
+
+        private static async Task UpdateRelation(IDynamicEntity entity, ulong entityCas, PropertyInfo navigationProperty, IDynamicEntity secondaryEntity, string tenantId, IBucket bucket)
+        {
+            var constraints =
+                navigationProperty.Attributes(typeof (ReferentialConstraintAttribute)).Cast<ReferentialConstraintAttribute>();
+            var secondId = await Helpers.CreateEntityId(tenantId, secondaryEntity);
+            var updated = false;
+            if (!constraints.Any())
+            {
+                if (navigationProperty.PropertyType.IsGenericType)
                 {
-                    array = new JArray();
-                    primaryDocument.Document.Content.Add(_navigationProperty.Name, array);
+                    var navigationIds = entity.GetProperty(navigationProperty.Name + "Ids") as IList<string>;
+                    if (!navigationIds.Contains(secondId))
+                    {
+                        navigationIds.Add(secondId);
+                        entity.SetProperty(navigationProperty.Name + "Ids", navigationIds);
+                        updated = true;
+                    }
                 }
                 else
                 {
-                    array = property.Value<JArray>();
+                    var idProperty = entity.GetProperty(navigationProperty.Name + "Id") as string;
+                    if (!secondId.Equals(idProperty))
+                    {
+                        entity.SetProperty(navigationProperty.Name + "Id", secondId);
+                        updated = true;
+                    }
                 }
 
-                if (!array.Contains(secondaryId))
-                {
-                    array.Add(secondaryId);
-                }
             }
             else
             {
-                primaryDocument.Document.Content.Add(_navigationProperty.Name, JValue.CreateString(secondaryId));
+                //Check that referal constraints are valid
+                foreach (var referentialConstraintAttribute in constraints)
+                {
+                    var dependantValue = entity.GetProperty(referentialConstraintAttribute.DependantProperty);
+                    var principalProperty = secondaryEntity.GetProperty(referentialConstraintAttribute.PrincipalProperty);
+                    if (!dependantValue.Equals(principalProperty))
+                    {
+                        entity.SetProperty(referentialConstraintAttribute.DependantProperty, principalProperty);
+                        updated = true;
+                    }
+                }
             }
 
-            var replaceResult = await bucket.ReplaceAsync(primaryDocument.Document);
-            if (!replaceResult.Success)
+            if (updated)
             {
-                throw ExceptionCreator.CreateDbException(replaceResult);
+                var entityId = await Helpers.CreateEntityId(tenantId, entity);
+                var replaceResult =
+                    await CommandHelpers.ReplaceDocumentAsync(bucket, entity.GetType(), entityId, entity, entityCas);
+                if (!replaceResult.Success)
+                {
+                    throw ExceptionCreator.CreateDbException(replaceResult);
+                }
             }
         }
     }

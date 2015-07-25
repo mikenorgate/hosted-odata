@@ -11,6 +11,7 @@ using System.Web.OData.Formatter;
 using Microsoft.OData.Edm;
 using Microsoft.OData.Edm.Library.Values;
 using Microsoft.OData.Edm.Vocabularies.V1;
+using Newtonsoft.Json;
 using OESoftware.Hosted.OData.Api.Core;
 
 namespace OESoftware.Hosted.OData.Api.DynamicAssembyGeneration
@@ -68,11 +69,13 @@ namespace OESoftware.Hosted.OData.Api.DynamicAssembyGeneration
 
                 var typeBuilder = CreateTypeBuilder(structuredType, model, moduleBuilder);
                 _typeBuilders.Add(typeName, typeBuilder);
+
                 var constructorBuilder = CreateConstructor(typeBuilder);
                 ILGenerator il = constructorBuilder.GetILGenerator();
                 foreach (var edmProperty in structuredType.DeclaredProperties)
                 {
-                    CreateProperty(edmProperty, model, typeBuilder, il, entityType != null && entityType.HasDeclaredKeyProperty(edmProperty));
+                    CreateProperty(edmProperty, model, typeBuilder, il,
+                        entityType != null && entityType.HasDeclaredKeyProperty(edmProperty));
                 }
 
                 il.Emit(OpCodes.Ret);
@@ -164,13 +167,38 @@ namespace OESoftware.Hosted.OData.Api.DynamicAssembyGeneration
 
             if (edmProperty.PropertyKind == EdmPropertyKind.Navigation)
             {
-                if (edmProperty.Type.IsCollection())
+                var navigationProperty = (IEdmNavigationProperty)edmProperty;
+
+                SetPropertyCustomAttribute(pFirst, typeof(JsonIgnoreAttribute));
+
+                if (navigationProperty.Partner != null)
                 {
-                    CreateProperty(propertyName + "Ids", typeof(IList<string>), typeBuilder, out fFirst);
+                    SetNavigationPartnerAttribute(pFirst, navigationProperty.Partner.Name);
+                }
+
+                if (navigationProperty.ReferentialConstraint != null)
+                {
+                    foreach (var propertyPair in navigationProperty.ReferentialConstraint.PropertyPairs)
+                    {
+                        SetReferentialConstraintAttribute(pFirst, propertyPair.DependentProperty.Name,
+                            propertyPair.PrincipalProperty.Name);
+                    }
+
                 }
                 else
                 {
-                    CreateProperty(propertyName + "Id", typeof (string), typeBuilder, out fFirst);
+                    if (edmProperty.Type.IsCollection())
+                    {
+                        CreateProperty(propertyName + "Ids", typeof(IList<string>), typeBuilder, out fFirst);
+                        var listType = typeof(List<string>);
+                        constructorIlGenerator.Emit(OpCodes.Ldarg_0);
+                        constructorIlGenerator.Emit(OpCodes.Newobj, listType.GetConstructor(new Type[0]));
+                        constructorIlGenerator.Emit(OpCodes.Stfld, fFirst);
+                    }
+                    else
+                    {
+                        CreateProperty(propertyName + "Id", typeof(string), typeBuilder, out fFirst);
+                    }
                 }
             }
         }
@@ -217,6 +245,20 @@ namespace OESoftware.Hosted.OData.Api.DynamicAssembyGeneration
             propertyBuilder.SetCustomAttribute(attributeBuilder);
         }
 
+        private static void SetNavigationPartnerAttribute(PropertyBuilder propertyBuilder, string partnerProperty)
+        {
+            var attributeBuilder = new CustomAttributeBuilder(typeof(NavigationPartnerAttribute).GetConstructor(new Type[] { typeof(string) }),
+                new object[] { partnerProperty });
+            propertyBuilder.SetCustomAttribute(attributeBuilder);
+        }
+
+        private static void SetReferentialConstraintAttribute(PropertyBuilder propertyBuilder, string dependantProperty, string principalProperty)
+        {
+            var attributeBuilder = new CustomAttributeBuilder(typeof(ReferentialConstraintAttribute).GetConstructor(new Type[] { typeof(string), typeof(string) }),
+                new object[] { dependantProperty, principalProperty });
+            propertyBuilder.SetCustomAttribute(attributeBuilder);
+        }
+
         private Type GetPropertyType(IEdmProperty edmProperty, IEdmModel model)
         {
             var edmPropertyType = GetEdmType(edmProperty.Type);
@@ -225,7 +267,14 @@ namespace OESoftware.Hosted.OData.Api.DynamicAssembyGeneration
             {
                 var schemaElement = model.FindDeclaredType(edmPropertyType.Definition.FullTypeName());
                 CreateType(model, schemaElement.FullName(), _moduleBuilders[schemaElement.Namespace]);
-                propertyType = _types[schemaElement.FullName()];
+                if (_typeBuilders.ContainsKey(schemaElement.FullName()))
+                {
+                    propertyType = _typeBuilders[schemaElement.FullName()];
+                }
+                else if (_enumBuilders.ContainsKey(schemaElement.FullName()))
+                {
+                    propertyType = _enumBuilders[schemaElement.FullName()];
+                }
             }
 
             if (edmProperty.Type.IsCollection())
